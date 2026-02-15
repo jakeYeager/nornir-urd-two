@@ -1,0 +1,21 @@
+[project]
+name = "nornir-urd-two"
+version = "0.1.0"
+description = "Verify and validate existing datasets as well as explore possible options to streamline new data collection."
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "skyfield>=1.54",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nornir_urd"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+]
