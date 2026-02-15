@@ -56,7 +56,7 @@ uv run python -m nornir_urd collect \
 
 ### Output format
 
-The output CSV matches the legacy data format with the following columns:
+The output CSV contains the following columns:
 
 `usgs_id, usgs_mag, event_at, solaration_year, solar_secs, lunar_secs, midnight_secs, longitude`
 

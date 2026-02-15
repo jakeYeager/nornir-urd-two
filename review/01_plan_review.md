@@ -68,14 +68,14 @@ nornir_urd/
  
 ---
 
-## Phase 2 - Legacy Data Validation
+## Phase 2 - ~Legacy Data Validation~ - COMPLETED SUCCESSFULLY
 
 ### Legacy Data Summary
 - **10,105 records** spanning 1949-12-25 to 2021-12-20
 - **Columns:** `usgs_id, usgs_mag, event_at, solaration_year, solar_secs, lunar_secs, midnight_secs, longitude`
 - Magnitudes range from 6.0+
 
-### Validation Strategy
+### ~~Validation Strategy~~ - STATUS: COMPLETE
 
 **`solar_secs` - Expected to differ**
 - Legacy used `YYYY/12/21T00:00:00Z` as approximate solstice times
@@ -91,7 +91,7 @@ nornir_urd/
 - Plan: re-implement the exact Ruby logic in Python, verify output matches legacy values exactly
 - If mismatches found: analyze whether they are systematic (rounding, off-by-one) or data-specific
 
-### Validation Output
+### ~~Validation Output~~ - STATUS: COMPLETE
 - A comparison CSV with columns: `usgs_id, event_at, legacy_solar_secs, new_solar_secs, solar_delta, legacy_lunar_secs, new_lunar_secs, lunar_delta, legacy_midnight_secs, new_midnight_secs, midnight_delta`
 - A summary report with statistics on each delta column saved to review/legacy_data_report.md
 

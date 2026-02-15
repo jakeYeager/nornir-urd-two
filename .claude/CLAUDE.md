@@ -2,7 +2,7 @@
 
 ## Project Description
 
-Nornir-urd-two: Verify and validate existing datasets as well as explore possible options to streamline new data collection. Includes astronomical calculation utilities (solstice/lunar timing) and a USGS earthquake data collection CLI.
+Nornir-urd-two: Verify and validate on existing datasets and then explore implementing new, more accurate and streamlined data collection. This includes new astronomical calculation utilities (solstice/lunar timing) and a USGS earthquake data collection CLI.
 
 ## File Structure
 
@@ -21,14 +21,11 @@ nornir-urd-two/
 ├── tests/
 │   ├── test_astro.py        (astronomical calculation tests)
 │   ├── test_cli.py          (CLI integration tests)
-│   ├── test_usgs.py         (USGS client tests)
-│   └── test_validation.py   (legacy data validation tests)
+│   └── test_usgs.py         (USGS client tests)
 ├── data/
-│   ├── legacy_data.csv      (historical earthquake dataset)
 │   └── output/              (collected data, gitignored CSVs)
 ├── review/
-│   ├── 01_plan_review.md
-│   └── legacy_data_report.md
+│   └── 01_plan_review.md    (documentation of plan 01)
 ├── metric_info_solar.md        (solar_secs metric explainer)
 ├── metric_info_lunar.md        (lunar_secs metric explainer)
 ├── metric_info_midnight.md     (midnight_secs metric explainer)
@@ -54,5 +51,5 @@ nornir-urd-two/
 
 - `astro.py` pre-computes solstice and new moon tables using Skyfield, then provides `solar_secs`, `lunar_secs`, and `midnight_secs` for event enrichment
 - `usgs.py` fetches earthquake data from the USGS FDSN API; `eventtype=earthquake` is hardcoded
-- `cli.py` orchestrates fetching + enrichment, outputting CSV matching the legacy format
+- `cli.py` orchestrates fetching + enrichment, outputting enriched CSV
 - Output CSV columns: `usgs_id, usgs_mag, event_at, solaration_year, solar_secs, lunar_secs, midnight_secs, longitude`

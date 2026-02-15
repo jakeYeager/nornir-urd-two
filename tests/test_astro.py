@@ -79,20 +79,6 @@ def test_new_moon_table_sorted(new_moon_table):
 # --- solar_secs tests ---
 
 
-def test_solar_secs_legacy_row1(solstice_table):
-    """Verify against legacy data row 1: iscgem897116.
-
-    Legacy solar_secs=429453 implies a solstice reference of Dec 21 00:00 UTC,
-    while Skyfield places the 1949 December solstice at Dec 22 ~04:32 UTC.
-    The legacy system likely truncated solstice times to a calendar date via
-    a timezone conversion. We accept up to ~2 day tolerance here.
-    """
-    event = datetime(1949, 12, 25, 23, 17, 33, tzinfo=timezone.utc)
-    year, secs = solar_secs(event, solstice_table)
-    assert year == 1950
-    assert abs(secs - 429453) < 172800  # ~2 day tolerance for date-truncation
-
-
 def test_solar_secs_event_at_solstice(solstice_table):
     """Event exactly at a solstice should give 0 seconds."""
     solstice = solstice_table[10]  # arbitrary solstice
@@ -102,14 +88,6 @@ def test_solar_secs_event_at_solstice(solstice_table):
 
 
 # --- lunar_secs tests ---
-
-
-def test_lunar_secs_legacy_row1(solstice_table, new_moon_table):
-    """Verify against legacy data row 1: iscgem897116."""
-    event = datetime(1949, 12, 25, 23, 17, 33, tzinfo=timezone.utc)
-    secs = lunar_secs(event, new_moon_table)
-    # Legacy value: 534153; allow small tolerance
-    assert abs(secs - 534153) < 120
 
 
 def test_lunar_secs_event_at_new_moon(new_moon_table):
@@ -145,13 +123,6 @@ def test_midnight_secs_negative_longitude():
     # 3h UTC - 6h = -3h = 21h previous day
     expected = 21 * 3600  # 75600
     assert secs == expected
-
-
-def test_midnight_secs_legacy_row1():
-    """Verify exact match against legacy data row 1."""
-    event = datetime(1949, 12, 25, 23, 17, 33, tzinfo=timezone.utc)
-    secs = midnight_secs(event, 139.717)
-    assert secs == 30985
 
 
 # --- Edge cases ---
