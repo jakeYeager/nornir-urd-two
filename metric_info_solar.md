@@ -41,38 +41,7 @@ This tells us the event occurred roughly one-quarter of the way through the sola
 
 The Sun's declination follows a smooth, roughly sinusoidal curve over each solaration. The graphic below illustrates this relationship.
 
-<p align="center">
-
-```
-Solar Declination vs. solar_secs
-
-  +23.4° ·····························+·····························
-         ·                          / \                           ·
-         ·                         /   \          Summer          ·
-  +15°   ·                        /     \         Solstice        ·
-         ·                       /       \        (max north)     ·
-  +10°   ·                      /         \                       ·
-         ·                     /           \                      ·
-   +5°   ·                    /             \                     ·
-         ·                   /               \                    ·
-    0° ──·──────────────────/─────────────────\───────────────────·──
-         ·  Vernal        /                     \    Autumnal     ·
-   -5°   ·  Equinox      /                       \  Equinox      ·
-         ·              /                           \             ·
-  -10°   ·             /                             \            ·
-         ·            /                               \           ·
-  -15°   ·           /                                 \          ·
-         ·          /                                   \         ·
-  -23.4° +·········+·····································+·········+
-         |         |              |              |                |
-         0      ~7.9M         ~15.8M         ~23.7M          ~31.6M
-                                                          solar_secs
-         Winter    Vernal      Summer        Autumnal      Next Winter
-         Solstice  Equinox     Solstice      Equinox       Solstice
-         (start)                                            (end)
-```
-
-</p>
+![Solar Declination](assets/solar_declination.svg)
 
 ### Reading the Curve
 

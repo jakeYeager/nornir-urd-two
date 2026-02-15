@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 570" width="1000" height="570">
+  <rect width="1000" height="570" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="500" y="30" font-family="Arial, sans-serif" font-size="20" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+    Solar Position Relative to Event Location at Four Points in the Day
+  </text>
+
+  <!-- ===== EARTH CIRCLE: center (400, 290), r=150 ===== -->
+
+  <!-- Night half (left semicircle) -->
+  <path d="M 400,140 A 150,150 0 0,0 400,440 Z" fill="#1e293b"/>
+  <!-- Day half (right semicircle) -->
+  <path d="M 400,140 A 150,150 0 0,1 400,440 Z" fill="#fef9c3"/>
+  <!-- Circle border -->
+  <circle cx="400" cy="290" r="150" fill="none" stroke="#333" stroke-width="2"/>
+  <!-- Terminator line (dashed) -->
+  <line x1="400" y1="140" x2="400" y2="440" stroke="#666" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- NIGHT / DAY labels inside circle -->
+  <text x="325" y="285" font-family="Arial, sans-serif" font-size="15" fill="#94a3b8" text-anchor="middle" font-weight="bold">NIGHT</text>
+  <text x="325" y="303" font-family="Arial, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">(facing away)</text>
+  <text x="475" y="285" font-family="Arial, sans-serif" font-size="15" fill="#92400e" text-anchor="middle" font-weight="bold">DAY</text>
+  <text x="475" y="303" font-family="Arial, sans-serif" font-size="10" fill="#78350f" text-anchor="middle">(facing Sun)</text>
+
+  <!-- ===== SUN ICON at (810, 290) ===== -->
+  <circle cx="810" cy="290" r="26" fill="#fbbf24" stroke="#f59e0b" stroke-width="2"/>
+  <g stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round">
+    <line x1="810" y1="254" x2="810" y2="244"/>
+    <line x1="810" y1="326" x2="810" y2="336"/>
+    <line x1="774" y1="290" x2="764" y2="290"/>
+    <line x1="846" y1="290" x2="856" y2="290"/>
+    <line x1="786" y1="266" x2="779" y2="259"/>
+    <line x1="834" y1="266" x2="841" y2="259"/>
+    <line x1="786" y1="314" x2="779" y2="321"/>
+    <line x1="834" y1="314" x2="841" y2="321"/>
+  </g>
+  <text x="810" y="362" font-family="Arial, sans-serif" font-size="13" fill="#92400e" text-anchor="middle" font-weight="bold">Sun</text>
+
+  <!-- Sunlight direction (dashed line from Sun toward Earth) -->
+  <line x1="764" y1="290" x2="565" y2="290" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="6,4"/>
+
+  <!-- ===== POSITION MARKERS (blue dots) ===== -->
+  <g fill="#2563eb" stroke="#fff" stroke-width="2">
+    <circle cx="250" cy="290" r="8"/>   <!-- Midnight: 9 o'clock (left) -->
+    <circle cx="400" cy="440" r="8"/>   <!-- Sunrise: 6 o'clock (bottom) -->
+    <circle cx="550" cy="290" r="8"/>   <!-- Noon: 3 o'clock (right) -->
+    <circle cx="400" cy="140" r="8"/>   <!-- Sunset: 12 o'clock (top) -->
+  </g>
+
+  <!-- ===== MIDNIGHT LABEL (left side) ===== -->
+  <g font-family="Arial, sans-serif" text-anchor="end">
+    <text x="228" y="255" font-size="14" font-weight="bold" fill="#2563eb">Local midnight (0h)</text>
+    <text x="228" y="273" font-size="12" fill="#333">06:00 UTC</text>
+    <text x="228" y="290" font-size="13" font-weight="bold" fill="#1a1a1a">midnight_secs = 0</text>
+    <text x="228" y="308" font-size="11" fill="#555" font-style="italic">Farthest from Sun</text>
+  </g>
+
+  <!-- ===== SUNSET LABEL (top) ===== -->
+  <g font-family="Arial, sans-serif" text-anchor="middle">
+    <text x="400" y="62" font-size="14" font-weight="bold" fill="#2563eb">Local sunset (18h)</text>
+    <text x="400" y="80" font-size="12" fill="#333">00:00 UTC</text>
+    <text x="400" y="97" font-size="13" font-weight="bold" fill="#1a1a1a">midnight_secs = 64,800</text>
+    <text x="400" y="115" font-size="11" fill="#555" font-style="italic">Approaching the far side</text>
+  </g>
+
+  <!-- ===== NOON LABEL (right side, above the dot) ===== -->
+  <g font-family="Arial, sans-serif" text-anchor="middle">
+    <text x="660" y="210" font-size="14" font-weight="bold" fill="#2563eb">Local noon (12h)</text>
+    <text x="660" y="228" font-size="12" fill="#333">18:00 UTC</text>
+    <text x="660" y="245" font-size="13" font-weight="bold" fill="#1a1a1a">midnight_secs = 43,200</text>
+    <text x="660" y="263" font-size="11" fill="#555" font-style="italic">Closest to Sun</text>
+  </g>
+  <!-- Connector line from noon dot to noon label -->
+  <line x1="556" y1="284" x2="600" y2="265" stroke="#ccc" stroke-width="1"/>
+
+  <!-- ===== SUNRISE LABEL (bottom) ===== -->
+  <g font-family="Arial, sans-serif" text-anchor="middle">
+    <text x="400" y="470" font-size="14" font-weight="bold" fill="#2563eb">Local sunrise (6h)</text>
+    <text x="400" y="488" font-size="12" fill="#333">12:00 UTC</text>
+    <text x="400" y="505" font-size="13" font-weight="bold" fill="#1a1a1a">midnight_secs = 21,600</text>
+    <text x="400" y="523" font-size="11" fill="#555" font-style="italic">Crossing the horizon</text>
+  </g>
+
+  <!-- ===== ROTATION DIRECTION NOTE ===== -->
+  <text x="500" y="555" font-family="Arial, sans-serif" font-size="11" fill="#999" text-anchor="middle" font-style="italic">
+    View from above North Pole — Earth rotates counterclockwise — all examples use longitude −90°
+  </text>
+</svg>
