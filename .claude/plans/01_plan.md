@@ -35,7 +35,9 @@ def time_at_longitude = self.event_at + seconds_from_utc
 def seconds_from_utc = (self.longitude / (360.0 / 24.hours)).to_i
 ```
 
-### Phase 2 - legacy data validation and testing
+### Phase 2 - ~~legacy data validation and testing~~
+
+**--- STATUS COMPLETE ---**
 
 I have existing data for us to test and validate against located at @data/legacy_data.csv. I know that there is the following issues with the data that need to be reviewed, tested and addressed:
 
@@ -43,6 +45,7 @@ I have existing data for us to test and validate against located at @data/legacy
 - `lunar_secs` should be pretty close as I did attempt to use exact new moon event timestamps. However in my data analysis there appears to be slight deficits which could indicate calculation errors
 - `midnight_secs` is suspect as it is a wholly contrived measuement that could contain defects. This is a critical measuement so proper review and testing is required
 
+**--- STATUS COMPLETE ---**
 
 ### Phase 3 - new data collction
 
