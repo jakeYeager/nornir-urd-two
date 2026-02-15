@@ -5,8 +5,12 @@ description = "Verify and validate existing datasets as well as explore possible
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "httpx>=0.28",
     "skyfield>=1.54",
 ]
+
+[project.scripts]
+nornir-urd = "nornir_urd.cli:main"
 
 [build-system]
 requires = ["hatchling"]

@@ -7,6 +7,7 @@ from .astro import (
     midnight_secs,
     solar_secs,
 )
+from .usgs import fetch_earthquakes
 
 __all__ = [
     "build_solstice_table",
@@ -14,4 +15,5 @@ __all__ = [
     "solar_secs",
     "lunar_secs",
     "midnight_secs",
+    "fetch_earthquakes",
 ]
