@@ -1,6 +1,9 @@
 # Skyfield ephemeris data
 *.bsp
 
+# Collected earthquake data (keep the directory, ignore CSVs)
+data/output/*.csv
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
