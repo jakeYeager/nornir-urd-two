@@ -29,6 +29,7 @@ def fetch_earthquakes(
     """
     params: dict[str, str | float] = {
         "format": "csv",
+        "eventtype": "earthquake",
         "starttime": start.isoformat(),
         "endtime": end.isoformat(),
         "minmagnitude": min_mag,
