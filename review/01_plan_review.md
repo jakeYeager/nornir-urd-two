@@ -93,7 +93,7 @@ nornir_urd/
 
 ### Validation Output
 - A comparison CSV with columns: `usgs_id, event_at, legacy_solar_secs, new_solar_secs, solar_delta, legacy_lunar_secs, new_lunar_secs, lunar_delta, legacy_midnight_secs, new_midnight_secs, midnight_delta`
-- A summary report with statistics on each delta column
+- A summary report with statistics on each delta column saved to review/legacy_data_report.md
 
 > **QUESTION 4:** For `solar_secs` validation, since we know the legacy values used approximate solstice times, should we also compute values using `YYYY/12/21T00:00:00Z` to verify our logic matches the legacy approach before switching to ephemeris-based values?
 

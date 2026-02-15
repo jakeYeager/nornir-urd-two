@@ -148,11 +148,10 @@ def test_midnight_secs_negative_longitude():
 
 
 def test_midnight_secs_legacy_row1():
-    """Verify against legacy data row 1 with tolerance."""
+    """Verify exact match against legacy data row 1."""
     event = datetime(1949, 12, 25, 23, 17, 33, tzinfo=timezone.utc)
     secs = midnight_secs(event, 139.717)
-    # Legacy value: 30985; our formula gives ~30990
-    assert abs(secs - 30985) < 10
+    assert secs == 30985
 
 
 # --- Edge cases ---

@@ -116,7 +116,7 @@ def midnight_secs(event_at: datetime, longitude: float) -> int:
     utc_secs_since_midnight = (event_at - utc_midnight).total_seconds()
 
     # Longitude offset in seconds (positive east)
-    offset_secs = longitude / 360.0 * 86400.0
+    offset_secs = int(longitude / (360.0 / 86400))
 
     # Local solar time in seconds since local midnight
     local_secs = (utc_secs_since_midnight + offset_secs) % 86400.0
