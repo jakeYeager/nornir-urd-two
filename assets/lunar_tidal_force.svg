@@ -1,0 +1,118 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" width="1000" height="600">
+  <!-- Background -->
+  <rect width="1000" height="600" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="500" y="35" font-family="Arial, sans-serif" font-size="22" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+    Combined Sun–Moon Tidal Force vs. lunar_secs
+  </text>
+
+  <!-- Define the plot area -->
+  <defs>
+    <clipPath id="plotArea">
+      <rect x="100" y="70" width="850" height="400"/>
+    </clipPath>
+  </defs>
+
+  <!-- Grid lines (horizontal) -->
+  <g stroke="#e0e0e0" stroke-width="1" opacity="0.5">
+    <line x1="100" y1="70" x2="950" y2="70"/>
+    <line x1="100" y1="170" x2="950" y2="170"/>
+    <line x1="100" y1="370" x2="950" y2="370"/>
+    <line x1="100" y1="470" x2="950" y2="470"/>
+  </g>
+
+  <!-- Grid lines (vertical) -->
+  <g stroke="#e0e0e0" stroke-width="1" opacity="0.5">
+    <line x1="100" y1="70" x2="100" y2="470"/>
+    <line x1="312.5" y1="70" x2="312.5" y2="470"/>
+    <line x1="525" y1="70" x2="525" y2="470"/>
+    <line x1="737.5" y1="70" x2="737.5" y2="470"/>
+    <line x1="950" y1="70" x2="950" y2="470"/>
+  </g>
+
+  <!-- Main axes -->
+  <g stroke="#333333" stroke-width="2">
+    <!-- Y-axis -->
+    <line x1="100" y1="70" x2="100" y2="470"/>
+    <!-- X-axis -->
+    <line x1="100" y1="470" x2="950" y2="470"/>
+    <!-- Average line (dashed) -->
+    <line x1="100" y1="270" x2="950" y2="270" stroke="#666666" stroke-width="1.5" stroke-dasharray="5,5"/>
+  </g>
+
+  <!-- Spring/Neap shaded regions -->
+  <!-- Spring tide regions (aligned) - light blue -->
+  <rect x="100" y="70" width="106.25" height="400" fill="#2563eb" opacity="0.06"/>
+  <rect x="418.75" y="70" width="212.5" height="400" fill="#2563eb" opacity="0.06"/>
+  <rect x="843.75" y="70" width="106.25" height="400" fill="#2563eb" opacity="0.06"/>
+  <!-- Neap tide regions (opposed) - light orange -->
+  <rect x="206.25" y="70" width="212.5" height="400" fill="#f59e0b" opacity="0.06"/>
+  <rect x="631.25" y="70" width="212.5" height="400" fill="#f59e0b" opacity="0.06"/>
+
+  <!-- Cosine curve: force = cos(4*pi*t/T), two complete cycles -->
+  <!-- y = 270 - 200*cos(4*pi*i/100), x = 100 + i*8.5 -->
+  <path d="M 100.0,70.0 L 117.0,76.3 L 134.0,94.7 L 151.0,124.2 L 168.0,162.8 L 185.0,208.2 L 202.0,257.4 L 219.0,307.5 L 236.0,355.2 L 253.0,397.5 L 270.0,431.8 L 287.0,456.0 L 304.0,468.4 L 312.5,470.0 L 321.0,468.4 L 338.0,456.0 L 355.0,431.8 L 372.0,397.5 L 389.0,355.2 L 406.0,307.5 L 423.0,257.4 L 440.0,208.2 L 457.0,162.8 L 474.0,124.2 L 491.0,94.7 L 508.0,76.3 L 525.0,70.0 L 542.0,76.3 L 559.0,94.7 L 576.0,124.2 L 593.0,162.8 L 610.0,208.2 L 627.0,257.4 L 644.0,307.5 L 661.0,355.2 L 678.0,397.5 L 695.0,431.8 L 712.0,456.0 L 729.0,468.4 L 737.5,470.0 L 746.0,468.4 L 763.0,456.0 L 780.0,431.8 L 797.0,397.5 L 814.0,355.2 L 831.0,307.5 L 848.0,257.4 L 865.0,208.2 L 882.0,162.8 L 899.0,124.2 L 916.0,94.7 L 933.0,76.3 L 950.0,70.0"
+        fill="none"
+        stroke="#2563eb"
+        stroke-width="3"
+        clip-path="url(#plotArea)"/>
+
+  <!-- Key point markers -->
+  <g fill="#2563eb">
+    <circle cx="100" cy="70" r="5"/>       <!-- New Moon (peak) -->
+    <circle cx="312.5" cy="470" r="5"/>     <!-- 1st Quarter (trough) -->
+    <circle cx="525" cy="70" r="5"/>        <!-- Full Moon (peak) -->
+    <circle cx="737.5" cy="470" r="5"/>     <!-- 3rd Quarter (trough) -->
+    <circle cx="950" cy="70" r="5"/>        <!-- Next New Moon (peak) -->
+  </g>
+
+  <!-- Y-axis labels -->
+  <g font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="end">
+    <text x="90" y="75">Strong</text>
+    <text x="90" y="275">Average</text>
+    <text x="90" y="475">Weak</text>
+  </g>
+
+  <!-- Y-axis title (rotated) -->
+  <text x="25" y="270" font-family="Arial, sans-serif" font-size="14" fill="#333333" text-anchor="middle" transform="rotate(-90, 25, 270)">
+    Tidal Force on Earth's Crust
+  </text>
+
+  <!-- X-axis labels (lunar_secs) -->
+  <g font-family="Arial, sans-serif" font-size="13" fill="#333333" text-anchor="middle">
+    <text x="100" y="495">0</text>
+    <text x="312.5" y="495">~638k</text>
+    <text x="525" y="495">~1,276k</text>
+    <text x="737.5" y="495">~1,914k</text>
+    <text x="950" y="495">~2,551k</text>
+  </g>
+
+  <!-- X-axis label -->
+  <text x="525" y="525" font-family="Arial, sans-serif" font-size="15" font-style="italic" text-anchor="middle" fill="#333333">
+    lunar_secs
+  </text>
+
+  <!-- Event labels -->
+  <g font-family="Arial, sans-serif" font-size="12" fill="#1a1a1a">
+    <text x="100" y="550" text-anchor="middle" font-weight="bold">New Moon</text>
+    <text x="100" y="565" text-anchor="middle" font-size="10">(start)</text>
+
+    <text x="312.5" y="550" text-anchor="middle" font-weight="bold">1st Quarter</text>
+
+    <text x="525" y="550" text-anchor="middle" font-weight="bold">Full Moon</text>
+
+    <text x="737.5" y="550" text-anchor="middle" font-weight="bold">3rd Quarter</text>
+
+    <text x="950" y="550" text-anchor="middle" font-weight="bold">New Moon</text>
+    <text x="950" y="565" text-anchor="middle" font-size="10">(next)</text>
+  </g>
+
+  <!-- Annotations for peaks and troughs -->
+  <g font-family="Arial, sans-serif" font-size="11" fill="#555555" font-style="italic">
+    <text x="120" y="63" text-anchor="start">Spring Tide</text>
+    <text x="545" y="63" text-anchor="start">Spring Tide</text>
+    <text x="332.5" y="465" text-anchor="start">Neap Tide</text>
+    <text x="757.5" y="465" text-anchor="start">Neap Tide</text>
+  </g>
+</svg>

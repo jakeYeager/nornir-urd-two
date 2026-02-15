@@ -54,38 +54,6 @@ utc_secs_since_midnight = 0
 local_secs = (0 + (-21,600)) mod 86,400 = (-21,600) mod 86,400 = 64,800
 ```
 
-<p align="center">
-
-```
-                        UTC midnight (00:00 UTC)
-                              ↓
-                         ·····+·····
-                     ···       |      ···
-                  ··           |          ··
-                ·              |             ·
-              ·                |               ·
-             ·                 |                ·
-            ·                  |                 ·
-                               |
-  Sunset ── ·     NIGHT SIDE   |   DAY SIDE     · ── Sunrise
-            ·     (facing      |  (facing        ·
-            ·      away)       |   the Sun)      ·
-             ·                 |                ·
-              ·                |               ·
-                ·              |             ·     ☀ Sun direction
-                  ··           |          ··       ──────────────→
-                     ···       |      ···
-                         ·····+·····
-
-                     ▲
-                     ╳  ← Location at -90° long.
-                         Local time: 18:00 (evening)
-                         midnight_secs = 64,800
-                         Sun is SETTING (approaching horizon)
-```
-
-</p>
-
 ---
 
 ### Example 2: Event at 06:00:00 UTC
@@ -101,37 +69,6 @@ midnight_secs:  0
 utc_secs_since_midnight = 21,600
 local_secs = (21,600 + (-21,600)) mod 86,400 = 0 mod 86,400 = 0
 ```
-
-<p align="center">
-
-```
-                          06:00 UTC
-                              ↓
-                         ·····+·····
-                     ···       |      ···
-                  ··           |          ··
-                ·              |             ·
-              ·                |               ·
-             ·                 |                ·
-            ·                  |                 ·
-                               |
-  Sunset ── ·     NIGHT SIDE   |   DAY SIDE     · ── Sunrise
-            ·     (facing      |  (facing        ·
-            ·      away)       |   the Sun)      ·
-             ·                 |                ·
-              ·                |               ·
-                ·              |             ·     ☀ Sun direction
-                  ··           |          ··       ──────────────→
-                     ···       |      ···
-                         ·····+·····
-                               |
-                               ╳  ← Location at -90° long.
-                                    Local time: 00:00 (midnight)
-                                    midnight_secs = 0
-                                    Sun is DIRECTLY OPPOSITE (farthest away)
-```
-
-</p>
 
 ---
 
@@ -149,37 +86,6 @@ utc_secs_since_midnight = 43,200
 local_secs = (43,200 + (-21,600)) mod 86,400 = 21,600
 ```
 
-<p align="center">
-
-```
-                          12:00 UTC
-                              ↓
-                         ·····+·····
-                     ···       |      ···
-                  ··           |          ··
-                ·              |             ·
-              ·                |               ·
-             ·                 |                ·
-            ·                  |                 ·
-                               |
-  Sunset ── ·     NIGHT SIDE   |   DAY SIDE     · ── Sunrise
-            ·     (facing      |  (facing        ·
-            ·      away)       |   the Sun)      ·
-             ·                 |                ·
-              ·                |               ·
-                ·     ╳        |             ·     ☀ Sun direction
-                  ·· ↑         |          ··       ──────────────→
-                     ···       |      ···
-                         ·····+·····
-
-                     Location at -90° long.
-                     Local time: 06:00 (morning)
-                     midnight_secs = 21,600
-                     Sun is RISING (crossing the horizon)
-```
-
-</p>
-
 ---
 
 ### Example 4: Event at 18:00:00 UTC
@@ -196,40 +102,11 @@ utc_secs_since_midnight = 64,800
 local_secs = (64,800 + (-21,600)) mod 86,400 = 43,200
 ```
 
-<p align="center">
-
-```
-                          18:00 UTC
-                              ↓
-                         ·····+·····
-                     ···       |      ···
-                  ··           |          ··
-                ·              |             ·
-              ·                |               ·
-             ·                 |                ·
-            ·                  |                 ·
-                               |
-  Sunset ── ·     NIGHT SIDE   |   DAY SIDE     · ── Sunrise
-            ·     (facing      |  (facing        ·
-            ·      away)       |   the Sun)      ·
-             ·                 |                ·
-              ·                |               ·
-                ·              |  ╳          ·     ☀ Sun direction
-                  ··           |  ↑       ··       ──────────────→
-                     ···       |      ···
-                         ·····+·····
-
-                     Location at -90° long.
-                     Local time: 12:00 (solar noon)
-                     midnight_secs = 43,200
-                     Sun is CLOSEST (nearest to overhead)
-```
-
-</p>
-
 ---
 
 ## Summary of Examples
+
+![Solar Position Relative to Event Location](assets/midnight_earth_positions.svg)
 
 | UTC Time | Local Solar Time | midnight_secs | Sun Position Relative to Location |
 |---|---|---|---|
@@ -240,34 +117,7 @@ local_secs = (64,800 + (-21,600)) mod 86,400 = 43,200
 
 ## The Full Daily Cycle
 
-<p align="center">
-
-```
-Sun's Angular Proximity to Event Location vs. midnight_secs
-
-  Closest    ·                         ╱╲
-  (noon)     ·                        ╱  ╲
-             ·                       ╱    ╲
-             ·                      ╱      ╲
-             ·                     ╱        ╲
-             ·                    ╱          ╲
-             ·                   ╱            ╲
-             ·                  ╱              ╲
-             ·                 ╱                ╲
-             ·                ╱                  ╲
-             ·               ╱                    ╲
-             ·              ╱                      ╲
-             ·             ╱                        ╲
-             ·            ╱                          ╲
-  Farthest   ·──+────────╱────────────────────────────╲────────+──
-  (midnight) ·  |       ╱                              ╲       |
-             0     21,600       43,200       64,800       86,400
-                                                     midnight_secs
-           Midnight  Sunrise      Noon       Sunset    Midnight
-             (0h)     (6h)       (12h)       (18h)      (24h)
-```
-
-</p>
+![Sun's Angular Proximity vs. midnight_secs](assets/midnight_daily_cycle.svg)
 
 ## Why Not Use Time Zones?
 

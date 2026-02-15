@@ -45,47 +45,7 @@ Because the lunation is defined by the **synodic** month (new moon to new moon),
 
 The graphic below shows both relationships:
 
-<p align="center">
-
-```
-Lunar Phase and Gravitational Alignment vs. lunar_secs
-
-
-         New Moon         1st Quarter        Full Moon       3rd Quarter       New Moon
-         (start)                                                               (next)
-           |                  |                  |                |               |
-           v                  v                  v                v               v
-
-    Sun ←──────────────────────────────────────────────────────────────────── (far away)
-
-
-           🌑               🌓                 🌕               🌗              🌑
-           ●                 ◐                  ○                ◑               ●
-           |                 |                  |                |               |
-           |   Moon orbits   |    Moon orbits   |   Moon orbits  |  Moon orbits  |
-           |   Earth  →→→    |    Earth  →→→    |   Earth  →→→   |  Earth  →→→   |
-           |                 |                  |                |               |
-           +-----------------+---------+--------+----------------+
-                                       |
-                                    EARTH
-
-
-    ───────┬─────────────────┬──────────────────┬────────────────┬──────────────┬──
-           0             ~638k             ~1,276k           ~1,914k        ~2,551k
-                                                                        lunar_secs
-
-    Gravitational alignment:
-
-    ALIGNED ████████░░░░░░░░░░░░░░░░░░░░░░░░████████████████░░░░░░░░░░░░░████████
-    (tide)  Spring                           Spring  ←→  Spring                Spring
-            Tide                              Tide          Tide               Tide
-
-    OPPOSED ░░░░░░░░████████████████████████░░░░░░░░░░░░░░░░████████████████░░░░░░
-    (tide)          Neap                    Neap            Neap            Neap
-                    Tide                    Tide            Tide            Tide
-```
-
-</p>
+![Lunar Phase and Gravitational Alignment](assets/lunar_alignment.svg)
 
 ### Gravitational Alignment by Phase
 
@@ -110,28 +70,7 @@ A single `lunar_secs` value captures this full picture without needing separate 
 
 ### The Gravitational Force Curve
 
-<p align="center">
-
-```
-Combined Sun-Moon Tidal Force on Earth's Crust
-
-    Strong ·  ╱╲                              ╱╲
-           · ╱  ╲                            ╱  ╲
-           ·╱    ╲                          ╱    ╲
-    ───────+──────╲────────────────────────╱──────+────────  Average
-           ·       ╲                      ╱       ╲
-           ·        ╲        ╱╲         ╱          ╲
-    Weak   ·         ╲     ╱   ╲      ╱             ╲
-           ·          ╲  ╱      ╲   ╱                ╲
-           ·           ╲╱        ╲ ╱                   ╲╱
-           ·
-           0        ~638k     ~1,276k     ~1,914k    ~2,551k
-                                                    lunar_secs
-           New       1st        Full        3rd        New
-           Moon     Quarter     Moon       Quarter     Moon
-```
-
-</p>
+![Combined Sun-Moon Tidal Force](assets/lunar_tidal_force.svg)
 
 Notice the **two peaks per lunation** --- one at new moon (solar and lunar forces aligned in the same direction) and one at full moon (forces aligned in opposite directions, but still additive for tidal stretching). The troughs at the quarter moons represent minimum combined tidal stress.
 

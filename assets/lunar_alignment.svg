@@ -1,0 +1,227 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 520" width="1000" height="520">
+  <!-- Background -->
+  <rect width="1000" height="520" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="500" y="35" font-family="Arial, sans-serif" font-size="22" font-weight="bold" text-anchor="middle" fill="#1a1a1a">
+    Lunar Phase and Gravitational Alignment vs. lunar_secs
+  </text>
+
+  <!-- ========== MOON PHASE CIRCLES (y=100) ========== -->
+  <defs>
+    <!-- Clip paths for quarter moon phases -->
+    <clipPath id="rightHalf">
+      <rect x="0" y="0" width="25" height="50"/>
+    </clipPath>
+    <clipPath id="leftHalf">
+      <rect x="-25" y="0" width="25" height="50"/>
+    </clipPath>
+  </defs>
+
+  <!-- Phase labels (above circles) -->
+  <g font-family="Arial, sans-serif" font-size="13" fill="#1a1a1a" text-anchor="middle" font-weight="bold">
+    <text x="100" y="72">New Moon</text>
+    <text x="312.5" y="72">1st Quarter</text>
+    <text x="525" y="72">Full Moon</text>
+    <text x="737.5" y="72">3rd Quarter</text>
+    <text x="950" y="72">New Moon</text>
+  </g>
+
+  <!-- New Moon (start) - dark filled circle -->
+  <circle cx="100" cy="110" r="25" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+
+  <!-- 1st Quarter - left half dark, right half light -->
+  <circle cx="312.5" cy="110" r="25" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+  <path d="M 312.5,85 A 25,25 0 0,1 312.5,135 Z" fill="#f0e68c" stroke="none"/>
+
+  <!-- Full Moon - light filled circle -->
+  <circle cx="525" cy="110" r="25" fill="#f0e68c" stroke="#333" stroke-width="1.5"/>
+
+  <!-- 3rd Quarter - right half dark, left half light -->
+  <circle cx="737.5" cy="110" r="25" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+  <path d="M 737.5,85 A 25,25 0 0,0 737.5,135 Z" fill="#f0e68c" stroke="none"/>
+
+  <!-- Next New Moon - dark filled circle -->
+  <circle cx="950" cy="110" r="25" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
+
+  <!-- Connecting timeline arrow through phases -->
+  <line x1="130" y1="110" x2="282" y2="110" stroke="#999" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="343" y1="110" x2="495" y2="110" stroke="#999" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="555" y1="110" x2="707" y2="110" stroke="#999" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <line x1="768" y1="110" x2="920" y2="110" stroke="#999" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- ========== SUN-MOON ANGLE DIAGRAM (y=170-230) ========== -->
+
+  <!-- Phase angle labels -->
+  <g font-family="Arial, sans-serif" font-size="12" fill="#555555" text-anchor="middle" font-style="italic">
+    <text x="100" y="155">0°</text>
+    <text x="312.5" y="155">90°</text>
+    <text x="525" y="155">180°</text>
+    <text x="737.5" y="155">270°</text>
+    <text x="950" y="155">360°</text>
+  </g>
+  <text x="55" y="155" font-family="Arial, sans-serif" font-size="11" fill="#777" text-anchor="end" font-style="italic">Sun–Moon</text>
+  <text x="55" y="168" font-family="Arial, sans-serif" font-size="11" fill="#777" text-anchor="end" font-style="italic">angle</text>
+
+  <!-- ========== GRAVITATIONAL ALIGNMENT BAR (y=195-255) ========== -->
+
+  <!-- Section label -->
+  <text x="55" y="230" font-family="Arial, sans-serif" font-size="12" fill="#555" text-anchor="end" font-style="italic">Gravitational</text>
+  <text x="55" y="243" font-family="Arial, sans-serif" font-size="12" fill="#555" text-anchor="end" font-style="italic">alignment</text>
+
+  <!-- Bar background (thin border) -->
+  <rect x="100" y="195" width="850" height="60" rx="4" fill="none" stroke="#ccc" stroke-width="1"/>
+
+  <!-- Spring tide regions (aligned) - blue -->
+  <rect x="100" y="195" width="106.25" height="60" rx="4" fill="#2563eb" opacity="0.25"/>
+  <rect x="418.75" y="195" width="212.5" height="60" fill="#2563eb" opacity="0.25"/>
+  <rect x="843.75" y="195" width="106.25" height="60" rx="4" fill="#2563eb" opacity="0.25"/>
+
+  <!-- Neap tide regions (opposed) - amber -->
+  <rect x="206.25" y="195" width="212.5" height="60" fill="#f59e0b" opacity="0.20"/>
+  <rect x="631.25" y="195" width="212.5" height="60" fill="#f59e0b" opacity="0.20"/>
+
+  <!-- Spring/Neap labels inside bars -->
+  <g font-family="Arial, sans-serif" font-size="12" font-weight="bold" text-anchor="middle">
+    <!-- Spring labels (blue) -->
+    <text x="100" y="221" fill="#1e40af">Spring</text>
+    <text x="100" y="236" fill="#1e40af">Tide</text>
+    <text x="525" y="221" fill="#1e40af">Spring</text>
+    <text x="525" y="236" fill="#1e40af">Tide</text>
+    <text x="950" y="221" fill="#1e40af">Spring</text>
+    <text x="950" y="236" fill="#1e40af">Tide</text>
+    <!-- Neap labels (amber) -->
+    <text x="312.5" y="221" fill="#92400e">Neap</text>
+    <text x="312.5" y="236" fill="#92400e">Tide</text>
+    <text x="737.5" y="221" fill="#92400e">Neap</text>
+    <text x="737.5" y="236" fill="#92400e">Tide</text>
+  </g>
+
+  <!-- Alignment descriptors below bar -->
+  <g font-family="Arial, sans-serif" font-size="11" fill="#555" text-anchor="middle" font-style="italic">
+    <text x="100" y="275">Sun + Moon</text>
+    <text x="100" y="288">pull together</text>
+    <text x="312.5" y="275">Forces at</text>
+    <text x="312.5" y="288">right angles</text>
+    <text x="525" y="275">Sun + Moon pull</text>
+    <text x="525" y="288">from opposite sides</text>
+    <text x="737.5" y="275">Forces at</text>
+    <text x="737.5" y="288">right angles</text>
+    <text x="950" y="275">Cycle</text>
+    <text x="950" y="288">resets</text>
+  </g>
+
+  <!-- ========== FORCE STRENGTH INDICATOR (y=310-360) ========== -->
+
+  <!-- Section label -->
+  <text x="55" y="340" font-family="Arial, sans-serif" font-size="12" fill="#555" text-anchor="end" font-style="italic">Combined</text>
+  <text x="55" y="353" font-family="Arial, sans-serif" font-size="12" fill="#555" text-anchor="end" font-style="italic">force</text>
+
+  <!-- Force strength bar (gradient representation using small rects) -->
+  <!-- Strong at 0, weak at 1/4, strong at 1/2, weak at 3/4, strong at 1 -->
+  <!-- Using discrete segments to approximate the cosine -->
+  <g opacity="0.8">
+    <!-- Segment 1: 0 to ~1/8 (strong, fading) -->
+    <rect x="100" y="315" width="21.25" height="40" fill="#2563eb" opacity="1.0"/>
+    <rect x="121.25" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.85"/>
+    <rect x="142.5" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.65"/>
+    <rect x="163.75" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.45"/>
+    <rect x="185.0" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.25"/>
+    <!-- Segment 2: ~1/8 to ~3/8 (weak) -->
+    <rect x="206.25" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="0.8"/>
+    <rect x="227.5" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="0.9"/>
+    <rect x="248.75" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="1.0"/>
+    <rect x="270.0" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="1.0"/>
+    <rect x="291.25" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="1.0"/>
+    <rect x="312.5" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="1.0"/>
+    <rect x="333.75" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="1.0"/>
+    <rect x="355.0" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="0.9"/>
+    <rect x="376.25" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="0.8"/>
+    <rect x="397.5" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.25"/>
+    <!-- Segment 3: ~3/8 to ~5/8 (strong) -->
+    <rect x="418.75" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.45"/>
+    <rect x="440.0" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.65"/>
+    <rect x="461.25" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.85"/>
+    <rect x="482.5" y="315" width="21.25" height="40" fill="#2563eb" opacity="1.0"/>
+    <rect x="503.75" y="315" width="21.25" height="40" fill="#2563eb" opacity="1.0"/>
+    <rect x="525.0" y="315" width="21.25" height="40" fill="#2563eb" opacity="1.0"/>
+    <rect x="546.25" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.85"/>
+    <rect x="567.5" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.65"/>
+    <rect x="588.75" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.45"/>
+    <rect x="610.0" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.25"/>
+    <!-- Segment 4: ~5/8 to ~7/8 (weak) -->
+    <rect x="631.25" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="0.8"/>
+    <rect x="652.5" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="0.9"/>
+    <rect x="673.75" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="1.0"/>
+    <rect x="695.0" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="1.0"/>
+    <rect x="716.25" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="1.0"/>
+    <rect x="737.5" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="1.0"/>
+    <rect x="758.75" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="1.0"/>
+    <rect x="780.0" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="0.9"/>
+    <rect x="801.25" y="315" width="21.25" height="40" fill="#e0e0e0" opacity="0.8"/>
+    <rect x="822.5" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.25"/>
+    <!-- Segment 5: ~7/8 to 1 (strong, growing) -->
+    <rect x="843.75" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.45"/>
+    <rect x="865.0" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.65"/>
+    <rect x="886.25" y="315" width="21.25" height="40" fill="#2563eb" opacity="0.85"/>
+    <rect x="907.5" y="315" width="21.25" height="40" fill="#2563eb" opacity="1.0"/>
+    <rect x="928.75" y="315" width="21.25" height="40" fill="#2563eb" opacity="1.0"/>
+  </g>
+
+  <!-- Force bar border -->
+  <rect x="100" y="315" width="850" height="40" rx="4" fill="none" stroke="#bbb" stroke-width="1"/>
+
+  <!-- Force bar labels -->
+  <g font-family="Arial, sans-serif" font-size="10" fill="#666" text-anchor="middle">
+    <text x="100" y="372">Strong</text>
+    <text x="312.5" y="372">Weak</text>
+    <text x="525" y="372">Strong</text>
+    <text x="737.5" y="372">Weak</text>
+    <text x="950" y="372">Strong</text>
+  </g>
+
+  <!-- ========== X-AXIS (y=400+) ========== -->
+
+  <!-- Tick marks -->
+  <g stroke="#333" stroke-width="1.5">
+    <line x1="100" y1="390" x2="100" y2="400"/>
+    <line x1="312.5" y1="390" x2="312.5" y2="400"/>
+    <line x1="525" y1="390" x2="525" y2="400"/>
+    <line x1="737.5" y1="390" x2="737.5" y2="400"/>
+    <line x1="950" y1="390" x2="950" y2="400"/>
+  </g>
+
+  <!-- Horizontal axis line -->
+  <line x1="100" y1="395" x2="950" y2="395" stroke="#333" stroke-width="1.5"/>
+
+  <!-- X-axis values -->
+  <g font-family="Arial, sans-serif" font-size="13" fill="#333333" text-anchor="middle">
+    <text x="100" y="418">0</text>
+    <text x="312.5" y="418">~638k</text>
+    <text x="525" y="418">~1,276k</text>
+    <text x="737.5" y="418">~1,914k</text>
+    <text x="950" y="418">~2,551k</text>
+  </g>
+
+  <!-- X-axis title -->
+  <text x="525" y="445" font-family="Arial, sans-serif" font-size="15" font-style="italic" text-anchor="middle" fill="#333333">
+    lunar_secs
+  </text>
+
+  <!-- Approximate days -->
+  <g font-family="Arial, sans-serif" font-size="10" fill="#999" text-anchor="middle">
+    <text x="100" y="460">0 days</text>
+    <text x="312.5" y="460">~7.4 days</text>
+    <text x="525" y="460">~14.8 days</text>
+    <text x="737.5" y="460">~22.1 days</text>
+    <text x="950" y="460">~29.5 days</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(100, 488)">
+    <rect x="0" y="0" width="14" height="14" rx="2" fill="#2563eb" opacity="0.35"/>
+    <text x="20" y="12" font-family="Arial, sans-serif" font-size="11" fill="#555">= Aligned (spring tide)</text>
+    <rect x="200" y="0" width="14" height="14" rx="2" fill="#f59e0b" opacity="0.30"/>
+    <text x="220" y="12" font-family="Arial, sans-serif" font-size="11" fill="#555">= Opposed (neap tide)</text>
+  </g>
+</svg>
