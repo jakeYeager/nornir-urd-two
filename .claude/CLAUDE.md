@@ -29,6 +29,9 @@ nornir-urd-two/
 ├── review/
 │   ├── 01_plan_review.md
 │   └── legacy_data_report.md
+├── metric_info_solar.md        (solar_secs metric explainer)
+├── metric_info_lunar.md        (lunar_secs metric explainer)
+├── metric_info_midnight.md     (midnight_secs metric explainer)
 ├── README.md
 └── pyproject.toml
 ```

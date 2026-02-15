@@ -118,3 +118,4 @@ solaration_year = preceding_solstice.year + 1  # label for the solaration
 ```
 
 The precision of Skyfield's ephemeris calculations means `solar_secs` is accurate to within a few seconds of the true astronomical position.
+

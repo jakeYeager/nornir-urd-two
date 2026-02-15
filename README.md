@@ -60,6 +60,16 @@ The output CSV matches the legacy data format with the following columns:
 
 `usgs_id, usgs_mag, event_at, solaration_year, solar_secs, lunar_secs, midnight_secs, longitude`
 
+## Metric Information
+
+Each earthquake record is enriched with three custom astronomical metrics that describe the gravitational geometry of the Sun and Moon relative to the event. These metrics encode the positions of celestial bodies as simple integer values (elapsed seconds), making them suitable for statistical analysis of tidal stress influences on seismic activity.
+
+- **[Solaration (`solar_secs`)](metric_info_solar.md)** --- Seconds elapsed since the preceding winter solstice. Tracks Earth's orbital position and maps directly to the Sun's declination angle, replacing the arbitrary civil calendar with an astronomically anchored annual cycle.
+
+- **[Lunation (`lunar_secs`)](metric_info_lunar.md)** --- Seconds elapsed since the preceding new moon. Simultaneously encodes the Moon's orbital position and the Sun-Moon phase alignment, capturing the spring/neap tidal cycle that drives both ocean tides and the lesser-known earth tides (periodic crustal deformation).
+
+- **[Midnight (`midnight_secs`)](metric_info_midnight.md)** --- Seconds elapsed since local solar midnight at the event's longitude. Uses a pure longitude-based time offset rather than civil time zones, providing an exact measure of the Sun's rotational position relative to the earthquake location.
+
 ## Tests
 
 ```bash
