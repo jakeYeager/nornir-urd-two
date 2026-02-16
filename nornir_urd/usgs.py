@@ -24,7 +24,7 @@ def fetch_earthquakes(
 ) -> list[dict]:
     """Fetch earthquake events from the USGS API.
 
-    Returns a list of dicts with keys: usgs_id, usgs_mag, event_at, longitude.
+    Returns a list of dicts with keys: usgs_id, usgs_mag, event_at, latitude, longitude, depth.
     The event_at value is an ISO 8601 string truncated to whole seconds.
     """
     params: dict[str, str | float] = {
@@ -83,7 +83,9 @@ def _parse_rows(rows: list[dict]) -> list[dict]:
                 "usgs_id": row["id"],
                 "usgs_mag": float(row["mag"]),
                 "event_at": _truncate_time(row["time"]),
+                "latitude": float(row["latitude"]),
                 "longitude": float(row["longitude"]),
+                "depth": float(row["depth"]),
             }
         )
     return results

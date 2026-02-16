@@ -49,9 +49,14 @@ class TestFetchEarthquakes:
         assert len(events) == 2
         assert events[0]["usgs_id"] == "us7000abc1"
         assert events[0]["usgs_mag"] == 6.3
+        assert events[0]["latitude"] == 35.6762
         assert events[0]["longitude"] == 139.6503
+        assert events[0]["depth"] == 25.0
         assert events[1]["usgs_id"] == "us7000abc2"
         assert events[1]["usgs_mag"] == 6.7
+        assert events[1]["latitude"] == -33.4489
+        assert events[1]["longitude"] == -70.6693
+        assert events[1]["depth"] == 50.0
 
     @patch("nornir_urd.usgs.httpx.get")
     def test_time_truncated(self, mock_get):

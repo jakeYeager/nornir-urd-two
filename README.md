@@ -38,17 +38,17 @@ Output CSVs are saved to `data/output/`, which is gitignored to keep collected d
 
 ### Query parameters
 
-| Option | Default | Description |
-|---|---|---|
-| `--output FILE` | *(required)* | Output CSV file path |
-| `--start DATE` | today - 5 days | Start date (ISO format, e.g. `2026-01-01`) |
-| `--end DATE` | today | End date (ISO format) |
-| `--min-mag FLOAT` | `6.0` | Minimum magnitude |
-| `--max-mag FLOAT` | `6.9` | Maximum magnitude |
-| `--min-lat FLOAT` | | Minimum latitude |
-| `--max-lat FLOAT` | | Maximum latitude |
-| `--min-lon FLOAT` | | Minimum longitude |
-| `--max-lon FLOAT` | | Maximum longitude |
+| Option            | Default        | Description                                |
+| ----------------- | -------------- | ------------------------------------------ |
+| `--output FILE`   | *(required)*   | Output CSV file path                       |
+| `--start DATE`    | today - 5 days | Start date (ISO format, e.g. `2026-01-01`) |
+| `--end DATE`      | today          | End date (ISO format)                      |
+| `--min-mag FLOAT` | `6.0`          | Minimum magnitude                          |
+| `--max-mag FLOAT` | `6.9`          | Maximum magnitude                          |
+| `--min-lat FLOAT` |                | Minimum latitude                           |
+| `--max-lat FLOAT` |                | Maximum latitude                           |
+| `--min-lon FLOAT` |                | Minimum longitude                          |
+| `--max-lon FLOAT` |                | Maximum longitude                          |
 
 Example with a custom date range and geographic bounds:
 
@@ -64,7 +64,49 @@ uv run python -m nornir_urd collect \
 
 The output CSV contains the following columns:
 
-`usgs_id, usgs_mag, event_at, solaration_year, solar_secs, lunar_secs, midnight_secs, longitude`
+`usgs_id, usgs_mag, event_at, solaration_year, solar_secs, lunar_secs, midnight_secs, latitude, longitude, depth`
+
+### Decluster
+
+Separate a catalog into mainshocks and aftershocks/foreshocks using the Gardner-Knopoff (1974) algorithm:
+
+```bash
+uv run python -m nornir_urd decluster \
+  --input data/output/global_events.csv \
+  --mainshocks data/output/mainshocks.csv \
+  --aftershocks data/output/aftershocks.csv
+```
+
+| Option               | Description                                            |
+| -------------------- | ------------------------------------------------------ |
+| `--input FILE`       | Input CSV file path                                    |
+| `--mainshocks FILE`  | Output CSV for mainshock (independent) events          |
+| `--aftershocks FILE` | Output CSV for aftershock/foreshock (dependent) events |
+
+#### Declustering existing CSVs
+
+The `decluster` command works on any CSV file, not just output from the `collect` command. The input CSV must contain these columns:
+
+| Required column | Description                                      |
+| --------------- | ------------------------------------------------ |
+| `event_at`      | ISO 8601 timestamp (e.g. `2026-01-15T12:00:00Z`) |
+| `latitude`      | Event latitude (float)                           |
+| `longitude`     | Event longitude (float)                          |
+| `usgs_mag`      | Event magnitude (float)                          |
+
+All other columns present in the input are preserved in both output files.
+
+#### Algorithm details and limitations
+
+The implementation uses the Gardner-Knopoff (1974) empirical formulas for magnitude-dependent space-time windows:
+
+- **Spatial window**: `d = 10^(0.1238 * M + 0.983)` km
+- **Temporal window** (M < 6.5): `t = 10^(0.5409 * M - 0.547)` days
+- **Temporal window** (M >= 6.5): `t = 10^(0.032 * M + 2.7389)` days
+
+Distances are computed using the Haversine formula (spherical Earth, radius 6371 km). This introduces a minor approximation versus the WGS84 ellipsoid -- maximum error is ~0.3% (~0.5 km at the equator for a 150 km distance). At the spatial scales of the G-K windows (tens to hundreds of km), this is negligible relative to the uncertainty in the window parameters themselves.
+
+The algorithm has O(n^2) time complexity (pairwise event comparison). This is efficient for catalogs up to ~50,000 events. For M6.0+ global catalogs (~100-200 events/year), runtime is effectively instant.
 
 ## Metric Information
 
