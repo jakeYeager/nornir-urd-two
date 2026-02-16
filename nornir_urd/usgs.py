@@ -85,7 +85,7 @@ def _parse_rows(rows: list[dict]) -> list[dict]:
                 "event_at": _truncate_time(row["time"]),
                 "latitude": float(row["latitude"]),
                 "longitude": float(row["longitude"]),
-                "depth": float(row["depth"]),
+                "depth": float(row["depth"]) if row["depth"] != "" else 0.0,
             }
         )
     return results
