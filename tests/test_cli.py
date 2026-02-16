@@ -12,13 +12,17 @@ FIXTURE_EVENTS = [
         "usgs_id": "us7000abc1",
         "usgs_mag": 6.3,
         "event_at": "2026-02-12T13:34:31Z",
+        "latitude": 35.6762,
         "longitude": 139.6503,
+        "depth": 25.0,
     },
     {
         "usgs_id": "us7000abc2",
         "usgs_mag": 6.7,
         "event_at": "2026-02-10T08:15:00Z",
+        "latitude": -33.4489,
         "longitude": -70.6693,
+        "depth": 50.0,
     },
 ]
 
@@ -59,7 +63,7 @@ class TestCollectCommand:
         assert outfile.exists()
         lines = outfile.read_text().strip().split("\n")
         header = lines[0]
-        assert header == "usgs_id,usgs_mag,event_at,solaration_year,solar_secs,lunar_secs,midnight_secs,longitude"
+        assert header == "usgs_id,usgs_mag,event_at,solaration_year,solar_secs,lunar_secs,midnight_secs,latitude,longitude,depth"
         # Two data rows
         assert len(lines) == 3
 
@@ -75,7 +79,7 @@ class TestCollectCommand:
 
         lines = outfile.read_text().strip().split("\n")
         row1 = lines[1].split(",")
-        # Verify structure: usgs_id, usgs_mag, event_at, solaration_year, solar_secs, lunar_secs, midnight_secs, longitude
+        # Verify structure: usgs_id, usgs_mag, event_at, solaration_year, solar_secs, lunar_secs, midnight_secs, latitude, longitude, depth
         assert row1[0] == "us7000abc1"
         assert row1[1] == "6.3"
         assert row1[2] == "2026-02-12T13:34:31Z"
@@ -84,7 +88,9 @@ class TestCollectCommand:
         assert int(row1[4]) > 0
         assert int(row1[5]) > 0
         assert int(row1[6]) > 0
-        assert row1[7] == "139.6503"
+        assert row1[7] == "35.6762"
+        assert row1[8] == "139.6503"
+        assert row1[9] == "25.0"
 
     @patch("nornir_urd.cli.fetch_earthquakes", return_value=[])
     def test_empty_results(self, mock_fetch, tmp_path):
@@ -98,3 +104,64 @@ class TestCollectCommand:
 
         lines = outfile.read_text().strip().split("\n")
         assert len(lines) == 1  # Header only
+
+
+DECLUSTER_CSV = """\
+usgs_id,usgs_mag,event_at,latitude,longitude,depth
+mainshock,7.0,2026-01-15T12:00:00Z,35.0,139.0,10.0
+aftershock,5.5,2026-01-15T14:00:00Z,35.1,139.1,15.0
+independent,6.5,2026-06-01T08:00:00Z,-33.0,-70.0,30.0
+"""
+
+
+class TestDeclusterCommand:
+    def test_splits_catalog(self, tmp_path):
+        infile = tmp_path / "input.csv"
+        infile.write_text(DECLUSTER_CSV)
+        mainfile = tmp_path / "mainshocks.csv"
+        afterfile = tmp_path / "aftershocks.csv"
+
+        main([
+            "decluster",
+            "--input", str(infile),
+            "--mainshocks", str(mainfile),
+            "--aftershocks", str(afterfile),
+        ])
+
+        main_lines = mainfile.read_text().strip().split("\n")
+        after_lines = afterfile.read_text().strip().split("\n")
+        # Header + 2 mainshocks (mainshock + independent)
+        assert len(main_lines) == 3
+        # Header + 1 aftershock
+        assert len(after_lines) == 2
+        assert "aftershock" in after_lines[1]
+
+    def test_preserves_all_columns(self, tmp_path):
+        infile = tmp_path / "input.csv"
+        infile.write_text(DECLUSTER_CSV)
+        mainfile = tmp_path / "mainshocks.csv"
+        afterfile = tmp_path / "aftershocks.csv"
+
+        main([
+            "decluster",
+            "--input", str(infile),
+            "--mainshocks", str(mainfile),
+            "--aftershocks", str(afterfile),
+        ])
+
+        header = mainfile.read_text().strip().split("\n")[0]
+        assert header == "usgs_id,usgs_mag,event_at,latitude,longitude,depth"
+
+    def test_missing_columns_exits(self, tmp_path):
+        infile = tmp_path / "bad.csv"
+        infile.write_text("usgs_id,usgs_mag\nev1,6.0\n")
+        mainfile = tmp_path / "m.csv"
+        afterfile = tmp_path / "a.csv"
+
+        with pytest.raises(SystemExit):
+            main([
+                "decluster",
+                "--input", str(infile),
+                "--mainshocks", str(mainfile),
+                "--aftershocks", str(afterfile),
+            ])

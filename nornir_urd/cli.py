@@ -8,6 +8,7 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 
 from . import astro
+from .decluster import decluster_gardner_knopoff
 from .usgs import fetch_earthquakes
 
 OUTPUT_COLUMNS = [
@@ -18,7 +19,9 @@ OUTPUT_COLUMNS = [
     "solar_secs",
     "lunar_secs",
     "midnight_secs",
+    "latitude",
     "longitude",
+    "depth",
 ]
 
 
@@ -53,6 +56,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--output", required=True, help="Output CSV file path",
     )
 
+    declust = sub.add_parser(
+        "decluster",
+        help="Decluster a CSV catalog using Gardner-Knopoff (1974)",
+    )
+    declust.add_argument(
+        "--input", required=True,
+        help="Input CSV file (must have event_at, latitude, longitude, usgs_mag columns)",
+    )
+    declust.add_argument(
+        "--mainshocks", required=True,
+        help="Output CSV path for mainshock events",
+    )
+    declust.add_argument(
+        "--aftershocks", required=True,
+        help="Output CSV path for aftershock/foreshock events",
+    )
+
     return parser
 
 
@@ -79,20 +99,18 @@ def _enrich(events: list[dict]) -> list[dict]:
                 "solar_secs": s_secs,
                 "lunar_secs": l_secs,
                 "midnight_secs": m_secs,
+                "latitude": event["latitude"],
                 "longitude": event["longitude"],
+                "depth": event["depth"],
             }
         )
     return enriched
 
 
-def main(argv: list[str] | None = None) -> None:
-    parser = build_parser()
-    args = parser.parse_args(argv)
+DECLUSTER_REQUIRED_COLUMNS = {"event_at", "latitude", "longitude", "usgs_mag"}
 
-    if args.command != "collect":
-        parser.print_help()
-        sys.exit(1)
 
+def _run_collect(args: argparse.Namespace) -> None:
     today = date.today()
     start = args.start if args.start is not None else today - timedelta(days=5)
     end = args.end if args.end is not None else today
@@ -116,3 +134,45 @@ def main(argv: list[str] | None = None) -> None:
         writer.writerows(enriched)
 
     print(f"Wrote {len(enriched)} events to {args.output}")
+
+
+def _run_decluster(args: argparse.Namespace) -> None:
+    with open(args.input, newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        missing = DECLUSTER_REQUIRED_COLUMNS - set(fieldnames)
+        if missing:
+            print(f"Error: input CSV missing required columns: {', '.join(sorted(missing))}")
+            sys.exit(1)
+        events = list(reader)
+
+    # csv.DictReader returns strings; cast numeric fields
+    for event in events:
+        event["latitude"] = float(event["latitude"])
+        event["longitude"] = float(event["longitude"])
+        event["usgs_mag"] = float(event["usgs_mag"])
+
+    mainshocks, aftershocks = decluster_gardner_knopoff(events)
+
+    for path, rows, label in [
+        (args.mainshocks, mainshocks, "mainshocks"),
+        (args.aftershocks, aftershocks, "aftershocks"),
+    ]:
+        with open(path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        print(f"Wrote {len(rows)} {label} to {path}")
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.command == "collect":
+        _run_collect(args)
+    elif args.command == "decluster":
+        _run_decluster(args)
+    else:
+        parser.print_help()
+        sys.exit(1)
