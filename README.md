@@ -1,6 +1,18 @@
 # nornir-urd-two
 
-Verify and validate existing datasets. Generate new sample populations of historical data.
+## Purpose
+
+Collect historical earthquake catalogs from the USGS ComCat API and enrich each event with astronomical metrics that encode the gravitational geometry of the Sun and Moon at the time and location of the event. The enriched catalogs support statistical analysis of whether celestial body positioning and tidal forcing correlate with seismic activity.
+
+## Astronomical Metric Information
+
+Each earthquake record is enriched with three custom astronomical metrics that describe the gravitational geometry of the Sun and Moon relative to the event. These metrics encode the positions of celestial bodies as simple integer values (elapsed seconds), making them suitable for statistical analysis of tidal stress influences on seismic activity.
+
+- **[Solaration (`solar_secs`)](metric_info_solar.md)** --- Seconds elapsed since the preceding winter solstice. Tracks Earth's orbital position and maps directly to the Sun's declination angle, replacing the arbitrary civil calendar with an astronomically anchored annual cycle.
+
+- **[Lunation (`lunar_secs`)](metric_info_lunar.md)** --- Seconds elapsed since the preceding new moon. Simultaneously encodes the Moon's orbital position and the Sun-Moon phase alignment, capturing the spring/neap tidal cycle that drives both ocean tides and the lesser-known earth tides (periodic crustal deformation).
+
+- **[Midnight (`midnight_secs`)](metric_info_midnight.md)** --- Seconds elapsed since local solar midnight at the event's longitude. Uses a pure longitude-based time offset rather than civil time zones, providing an exact measure of the Sun's rotational position relative to the earthquake location.
 
 ## Installation
 
@@ -107,16 +119,6 @@ The implementation uses the Gardner-Knopoff (1974) empirical formulas for magnit
 Distances are computed using the Haversine formula (spherical Earth, radius 6371 km). This introduces a minor approximation versus the WGS84 ellipsoid -- maximum error is ~0.3% (~0.5 km at the equator for a 150 km distance). At the spatial scales of the G-K windows (tens to hundreds of km), this is negligible relative to the uncertainty in the window parameters themselves.
 
 The algorithm has O(n^2) time complexity (pairwise event comparison). This is efficient for catalogs up to ~50,000 events. For M6.0+ global catalogs (~100-200 events/year), runtime is effectively instant.
-
-## Metric Information
-
-Each earthquake record is enriched with three custom astronomical metrics that describe the gravitational geometry of the Sun and Moon relative to the event. These metrics encode the positions of celestial bodies as simple integer values (elapsed seconds), making them suitable for statistical analysis of tidal stress influences on seismic activity.
-
-- **[Solaration (`solar_secs`)](metric_info_solar.md)** --- Seconds elapsed since the preceding winter solstice. Tracks Earth's orbital position and maps directly to the Sun's declination angle, replacing the arbitrary civil calendar with an astronomically anchored annual cycle.
-
-- **[Lunation (`lunar_secs`)](metric_info_lunar.md)** --- Seconds elapsed since the preceding new moon. Simultaneously encodes the Moon's orbital position and the Sun-Moon phase alignment, capturing the spring/neap tidal cycle that drives both ocean tides and the lesser-known earth tides (periodic crustal deformation).
-
-- **[Midnight (`midnight_secs`)](metric_info_midnight.md)** --- Seconds elapsed since local solar midnight at the event's longitude. Uses a pure longitude-based time offset rather than civil time zones, providing an exact measure of the Sun's rotational position relative to the earthquake location.
 
 ## Tests
 
