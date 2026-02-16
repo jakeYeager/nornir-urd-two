@@ -26,6 +26,12 @@ Collect earthquake data from the USGS API and enrich it with astronomical calcul
 
 ```bash
 uv run python -m nornir_urd collect --output data/output/earthquakes.csv
+
+# With custom parameters -- ~9,800 events
+uv run python -m nornir_urd collect \
+  --start 1949-12-25 --end 2021-12-20 \
+  --min-mag 6.0 --max-mag 9.9 \
+  --output data/output/global_events.csv
 ```
 
 Output CSVs are saved to `data/output/`, which is gitignored to keep collected data out of version control.
