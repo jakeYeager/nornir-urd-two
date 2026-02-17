@@ -80,7 +80,7 @@ The output CSV contains the following columns:
 
 ### Decluster
 
-Separate a catalog into mainshocks and aftershocks/foreshocks using the Gardner-Knopoff (1974) algorithm:
+Separate a catalog into mainshocks and aftershocks/foreshocks using the Gardner-Knopoff (1974) algorithm. This is a pure-Python implementation of the algorithm, even though other libraries exist and [were considered](review/no_open_quake.md):
 
 ```bash
 uv run python -m nornir_urd decluster \
