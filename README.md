@@ -120,6 +120,42 @@ Distances are computed using the Haversine formula (spherical Earth, radius 6371
 
 The algorithm has O(n^2) time complexity (pairwise event comparison). This is efficient for catalogs up to ~50,000 events. For M6.0+ global catalogs (~100-200 events/year), runtime is effectively instant.
 
+### Window
+
+Run the Gardner-Knopoff algorithm with a scaled window and produce aftershock output enriched with parent attribution columns. `window` accepts the same input format as `decluster` but requires an explicit `--window-size` multiplier and adds four columns to the aftershock output:
+
+```bash
+uv run python -m nornir_urd window \
+  --window-size 1.0 \
+  --input data/output/global_events.csv \
+  --mainshocks data/output/mainshocks.csv \
+  --aftershocks data/output/aftershocks.csv
+```
+
+| Option               | Description                                                     |
+| -------------------- | --------------------------------------------------------------- |
+| `--window-size FLOAT` | *(required)* Scalar multiplier for both G-K window dimensions  |
+| `--input FILE`       | Input CSV file path                                             |
+| `--mainshocks FILE`  | Output CSV for mainshock (independent) events                   |
+| `--aftershocks FILE` | Output CSV for aftershock/foreshock events (with extra columns) |
+
+The `--window-size` multiplier is applied to both the spatial (km) and temporal (days) dimensions of the G-K windows. Values below `1.0` produce tighter windows (fewer events removed), values above `1.0` produce wider windows (more events removed).
+
+#### Aftershock output columns
+
+The aftershock CSV contains all columns from the input plus four attribution columns appended at the end:
+
+| Column             | Description                                                                       |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `parent_id`        | `usgs_id` of the mainshock whose window claimed this event                        |
+| `parent_magnitude` | Magnitude of the parent mainshock                                                 |
+| `delta_t_sec`      | Signed elapsed seconds from the parent to this event (negative for foreshocks)    |
+| `delta_dist_km`    | Great-circle distance in km between this event and its parent                     |
+
+When two mainshock windows overlap and both could claim the same event, the parent is the mainshock with the smallest `|delta_t_sec|` (temporal proximity takes priority over spatial proximity).
+
+The mainshock output is identical in format to `decluster` — original columns only, no attribution metadata.
+
 ## Tests
 
 ```bash

@@ -44,6 +44,16 @@ def gk_window(magnitude: float) -> tuple[float, float]:
     return distance_km, time_days
 
 
+def gk_window_scaled(magnitude: float, scale: float) -> tuple[float, float]:
+    """Return G-K (1974) space and time windows multiplied by *scale*.
+
+    Returns:
+        (distance_km, time_days) -- both dimensions scaled by the factor.
+    """
+    distance_km, time_days = gk_window(magnitude)
+    return distance_km * scale, time_days * scale
+
+
 def _parse_event_time(event_at: str) -> datetime:
     """Parse an ISO 8601 event_at string to a tz-aware datetime."""
     return datetime.fromisoformat(event_at.replace("Z", "+00:00"))
@@ -105,4 +115,97 @@ def decluster_gardner_knopoff(
 
     mainshocks = [e for i, e in enumerate(events) if not is_dependent[i]]
     aftershocks = [e for i, e in enumerate(events) if is_dependent[i]]
+    return mainshocks, aftershocks
+
+
+def decluster_with_parents(
+    events: list[dict],
+    window_scale: float = 1.0,
+) -> tuple[list[dict], list[dict]]:
+    """Decluster using G-K (1974) with scaled windows and per-aftershock parent attribution.
+
+    Each dependent event dict is extended with four attribution columns:
+        parent_id        -- usgs_id of the triggering mainshock
+        parent_magnitude -- usgs_mag of the triggering mainshock
+        delta_t_sec      -- signed elapsed seconds from parent to this event
+                           (negative when this event precedes the parent)
+        delta_dist_km    -- great-circle distance in km between this event and its parent
+
+    When two mainshock windows overlap and both could claim the same dependent event,
+    the parent is the mainshock with the smallest |delta_t_sec| (temporal proximity).
+
+    Args:
+        events:       List of event dicts; must contain event_at, latitude,
+                      longitude, usgs_id, usgs_mag.
+        window_scale: Scalar multiplier applied to both G-K spatial and temporal
+                      windows (e.g. 0.75 for tighter, 1.25 for wider).
+
+    Returns:
+        (mainshocks, aftershocks) -- mainshocks are unmodified event dicts;
+        aftershock dicts carry the four extra attribution keys.
+    """
+    if not events:
+        return [], []
+
+    n = len(events)
+    times = [_parse_event_time(e["event_at"]) for e in events]
+    indices_by_mag = sorted(range(n), key=lambda i: events[i]["usgs_mag"], reverse=True)
+
+    is_dependent = [False] * n
+    parent_idx: list[int | None] = [None] * n
+    parent_dt_abs = [float("inf")] * n  # |delta_t_sec| for current best parent
+
+    for idx in indices_by_mag:
+        if is_dependent[idx]:
+            continue
+
+        mag = events[idx]["usgs_mag"]
+        lat = events[idx]["latitude"]
+        lon = events[idx]["longitude"]
+        t = times[idx]
+        dist_window, time_window = gk_window_scaled(mag, window_scale)
+        time_window_secs = time_window * 86400.0
+
+        for j in range(n):
+            if j == idx:
+                continue
+            if events[j]["usgs_mag"] > mag:
+                continue
+
+            dt_abs = abs((times[j] - t).total_seconds())
+            if dt_abs > time_window_secs:
+                continue
+
+            dist = haversine_km(lat, lon, events[j]["latitude"], events[j]["longitude"])
+            if dist > dist_window:
+                continue
+
+            if not is_dependent[j]:
+                is_dependent[j] = True
+                parent_idx[j] = idx
+                parent_dt_abs[j] = dt_abs
+            elif dt_abs < parent_dt_abs[j]:
+                # Re-assign to the temporally closer mainshock
+                parent_idx[j] = idx
+                parent_dt_abs[j] = dt_abs
+
+    mainshocks = [e for i, e in enumerate(events) if not is_dependent[i]]
+    aftershocks = []
+    for i, e in enumerate(events):
+        if not is_dependent[i]:
+            continue
+        p = parent_idx[i]
+        parent = events[p]
+        dt_sec = (times[i] - times[p]).total_seconds()
+        dist_km = haversine_km(
+            parent["latitude"], parent["longitude"],
+            e["latitude"], e["longitude"],
+        )
+        after_event = dict(e)
+        after_event["parent_id"] = parent["usgs_id"]
+        after_event["parent_magnitude"] = parent["usgs_mag"]
+        after_event["delta_t_sec"] = dt_sec
+        after_event["delta_dist_km"] = dist_km
+        aftershocks.append(after_event)
+
     return mainshocks, aftershocks

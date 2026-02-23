@@ -8,7 +8,7 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 
 from . import astro
-from .decluster import decluster_gardner_knopoff
+from .decluster import decluster_gardner_knopoff, decluster_with_parents
 from .usgs import fetch_earthquakes
 
 OUTPUT_COLUMNS = [
@@ -73,6 +73,27 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output CSV path for aftershock/foreshock events",
     )
 
+    window_p = sub.add_parser(
+        "window",
+        help="Decluster with a scaled G-K window; aftershock output includes parent attribution",
+    )
+    window_p.add_argument(
+        "--window-size", type=float, required=True,
+        help="Scalar multiplier for G-K windows (e.g. 0.75 = tighter, 1.25 = wider)",
+    )
+    window_p.add_argument(
+        "--input", required=True,
+        help="Input CSV file (must have event_at, latitude, longitude, usgs_mag columns)",
+    )
+    window_p.add_argument(
+        "--mainshocks", required=True,
+        help="Output CSV path for mainshock events",
+    )
+    window_p.add_argument(
+        "--aftershocks", required=True,
+        help="Output CSV path for aftershock events (includes parent attribution columns)",
+    )
+
     return parser
 
 
@@ -108,6 +129,8 @@ def _enrich(events: list[dict]) -> list[dict]:
 
 
 DECLUSTER_REQUIRED_COLUMNS = {"event_at", "latitude", "longitude", "usgs_mag"}
+
+AFTERSHOCK_EXTRA_COLUMNS = ["parent_id", "parent_magnitude", "delta_t_sec", "delta_dist_km"]
 
 
 def _run_collect(args: argparse.Namespace) -> None:
@@ -165,6 +188,38 @@ def _run_decluster(args: argparse.Namespace) -> None:
         print(f"Wrote {len(rows)} {label} to {path}")
 
 
+def _run_window(args: argparse.Namespace) -> None:
+    with open(args.input, newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        missing = DECLUSTER_REQUIRED_COLUMNS - set(fieldnames)
+        if missing:
+            print(f"Error: input CSV missing required columns: {', '.join(sorted(missing))}")
+            sys.exit(1)
+        events = list(reader)
+
+    for event in events:
+        event["latitude"] = float(event["latitude"])
+        event["longitude"] = float(event["longitude"])
+        event["usgs_mag"] = float(event["usgs_mag"])
+
+    mainshocks, aftershocks = decluster_with_parents(events, window_scale=args.window_size)
+
+    aftershock_fieldnames = fieldnames + AFTERSHOCK_EXTRA_COLUMNS
+
+    with open(args.mainshocks, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(mainshocks)
+    print(f"Wrote {len(mainshocks)} mainshocks to {args.mainshocks}")
+
+    with open(args.aftershocks, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=aftershock_fieldnames)
+        writer.writeheader()
+        writer.writerows(aftershocks)
+    print(f"Wrote {len(aftershocks)} aftershocks to {args.aftershocks}")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -173,6 +228,8 @@ def main(argv: list[str] | None = None) -> None:
         _run_collect(args)
     elif args.command == "decluster":
         _run_decluster(args)
+    elif args.command == "window":
+        _run_window(args)
     else:
         parser.print_help()
         sys.exit(1)
