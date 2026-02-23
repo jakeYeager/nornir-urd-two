@@ -2,7 +2,7 @@
 
 ## Project Description
 
-Nornir-urd-two: Verify and validate on existing datasets and then explore implementing new, more accurate and streamlined data collection. This includes new astronomical calculation utilities (solstice/lunar timing) and a USGS earthquake data collection CLI.
+Collect historical earthquake catalogs from the USGS ComCat API and enrich each event with astronomical metrics that encode the gravitational geometry of the Sun and Moon at the time and location of the event. The enriched catalogs support statistical analysis of whether celestial body positioning and tidal forcing correlate with seismic activity. This collection method is accessible via the CLI and includes a declustering utility that uses the Gardner-Knopoff (1974) algorithm.
 
 ## File Structure
 
