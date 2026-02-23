@@ -23,3 +23,8 @@ packages = ["nornir_urd"]
 dev = [
     "pytest>=8.4.2",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with -m 'not slow')",
+]
