@@ -21,6 +21,7 @@ def fetch_earthquakes(
     max_lat: float | None = None,
     min_lon: float | None = None,
     max_lon: float | None = None,
+    catalog: str | None = "iscgem",
 ) -> list[dict]:
     """Fetch earthquake events from the USGS API.
 
@@ -43,6 +44,8 @@ def fetch_earthquakes(
         params["minlongitude"] = min_lon
     if max_lon is not None:
         params["maxlongitude"] = max_lon
+    if catalog is not None:
+        params["catalog"] = catalog
 
     response = httpx.get(USGS_CSV_URL, params=params, timeout=60)
     response.raise_for_status()
@@ -56,9 +59,9 @@ def fetch_earthquakes(
             # Can't split further, return what we have
             return _parse_rows(rows)
         left = fetch_earthquakes(start, mid, min_mag, max_mag,
-                                 min_lat, max_lat, min_lon, max_lon)
+                                 min_lat, max_lat, min_lon, max_lon, catalog)
         right = fetch_earthquakes(mid, end, min_mag, max_mag,
-                                  min_lat, max_lat, min_lon, max_lon)
+                                  min_lat, max_lat, min_lon, max_lon, catalog)
         return left + right
 
     return _parse_rows(rows)

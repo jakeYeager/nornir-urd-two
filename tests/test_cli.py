@@ -37,6 +37,11 @@ class TestArgDefaults:
         assert args.min_mag == 6.0
         assert args.max_mag == 6.9
 
+    def test_catalog_default(self):
+        parser = build_parser()
+        args = parser.parse_args(["collect", "--output", "out.csv"])
+        assert args.catalog == "iscgem"
+
     def test_explicit_dates(self):
         parser = build_parser()
         args = parser.parse_args([

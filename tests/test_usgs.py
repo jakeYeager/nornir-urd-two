@@ -118,3 +118,30 @@ class TestFetchEarthquakes:
 
         assert len(events) == 1
         assert events[0]["depth"] == 0.0
+
+    @patch("nornir_urd.usgs.httpx.get")
+    def test_catalog_included_by_default(self, mock_get):
+        mock_get.return_value = _mock_response(SAMPLE_CSV)
+
+        fetch_earthquakes(
+            start=date(2026, 2, 9),
+            end=date(2026, 2, 13),
+        )
+
+        call_kwargs = mock_get.call_args
+        params = call_kwargs.kwargs.get("params") or call_kwargs[1].get("params")
+        assert params["catalog"] == "iscgem"
+
+    @patch("nornir_urd.usgs.httpx.get")
+    def test_catalog_omitted_when_none(self, mock_get):
+        mock_get.return_value = _mock_response(SAMPLE_CSV)
+
+        fetch_earthquakes(
+            start=date(2026, 2, 9),
+            end=date(2026, 2, 13),
+            catalog=None,
+        )
+
+        call_kwargs = mock_get.call_args
+        params = call_kwargs.kwargs.get("params") or call_kwargs[1].get("params")
+        assert "catalog" not in params

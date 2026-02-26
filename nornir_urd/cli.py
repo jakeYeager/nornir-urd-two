@@ -53,6 +53,10 @@ def build_parser() -> argparse.ArgumentParser:
     collect.add_argument("--min-lon", type=float, default=None)
     collect.add_argument("--max-lon", type=float, default=None)
     collect.add_argument(
+        "--catalog", type=str, default="iscgem",
+        help="USGS catalog identifier (default: iscgem)",
+    )
+    collect.add_argument(
         "--output", required=True, help="Output CSV file path",
     )
 
@@ -147,6 +151,7 @@ def _run_collect(args: argparse.Namespace) -> None:
         max_lat=args.max_lat,
         min_lon=args.min_lon,
         max_lon=args.max_lon,
+        catalog=args.catalog,
     )
 
     enriched = _enrich(events)
