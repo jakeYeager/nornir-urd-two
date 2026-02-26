@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Collect historical earthquake catalogs from the USGS ComCat API and enrich each event with astronomical metrics that encode the gravitational geometry of the Sun and Moon at the time and location of the event. The enriched catalogs support statistical analysis of whether celestial body positioning and tidal forcing correlate with seismic activity.
+Collect historical earthquake catalogs from the [USGS ISC-GEM / FDSN Event Web Service API](./review/usgs_data_source.md) and enrich each event with astronomical metrics that encode the gravitational geometry of the Sun and Moon at the time and location of the event. The enriched catalogs support statistical analysis of whether celestial body positioning and tidal forcing correlate with seismic activity.
+
+**Note:** The project API request targets the **ISC-GEM** catalog *only*. This is to use the catalog which provides the most complete catalog for *historical* events. The ComCat catalog is best suited for users needing recent or real-time data, but does not provide historical completeness or magnitude adjustments. A more full project data source [discription is here](./review/usgs_data_source.md).
 
 ## Astronomical Metric Information
 
