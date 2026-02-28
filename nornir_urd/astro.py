@@ -10,15 +10,18 @@ from __future__ import annotations
 import bisect
 import math
 from datetime import datetime, timezone
+from pathlib import Path
 
 from skyfield import almanac
-from skyfield.api import load
+from skyfield.api import Loader, load
+
+_LIB_DIR = Path(__file__).parent.parent / "lib"
 
 
 def _load_ephemeris():
     """Load the Skyfield ephemeris and timescale."""
     ts = load.timescale()
-    eph = load("de421.bsp")
+    eph = Loader(str(_LIB_DIR))("de421.bsp")
     return ts, eph
 
 
