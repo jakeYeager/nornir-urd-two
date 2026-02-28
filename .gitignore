@@ -4,6 +4,9 @@
 # digital model of plate boundaries
 *.dig
 
+# Large generated reference files in lib/
+lib/*.csv
+
 # Collected earthquake data (keep the directory, ignore CSVs & notes)
 data/output/*.csv
 data/output/*.md
