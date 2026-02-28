@@ -3,6 +3,7 @@ lib/*.bsp
 lib/*.csv
 lib/*.dat
 lib/*.dig
+lib/gcmt/*.*
 
 # Collected earthquake data (keep the directory, ignore CSVs & notes)
 data/output/*.csv
