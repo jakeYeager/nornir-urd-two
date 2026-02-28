@@ -245,6 +245,44 @@ uv run python -m nornir_urd ocean-class \
 
 Output columns: `usgs_id, ocean_class, dist_to_coast_km`
 
+### Focal mechanism join
+
+Join GCMT moment tensor solutions to ISC-GEM events by spatial-temporal proximity, classifying each matched event's focal mechanism type from its rake angle.
+
+#### Required data
+
+Download GCMT NDK files covering M ≥ 6.0, 1976–2021 from [globalcmt.org/CMTfiles.html](https://www.globalcmt.org/CMTfiles.html) and place all `.ndk` files in `lib/gcmt/`. The subcommand scans the directory for all `.ndk` files automatically. Pre-1976 ISC-GEM events (~15% of catalog) will have empty GCMT columns and `match_confidence=null`.
+
+#### Running the join
+
+```bash
+uv run python -m nornir_urd focal-join \
+  --input data/output/global_events.csv \
+  --output data/output/focal_mechanisms.csv
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--gcmt-dir DIR` | `lib/gcmt/` | Directory containing GCMT `.ndk` files |
+| `--time-tol FLOAT` | `60` | Time match tolerance (seconds) |
+| `--dist-km FLOAT` | `50` | Spatial match tolerance (km) |
+| `--mag-tol FLOAT` | `0.3` | Magnitude match tolerance (Mw units) |
+
+Output retains all input columns plus eight GCMT columns appended:
+
+| Column | Description |
+| --- | --- |
+| `gcmt_id` | GCMT event identifier (e.g. `M010176A`) |
+| `mechanism` | `thrust`, `normal`, `strike_slip`, or `oblique` |
+| `rake` | NP1 rake angle (degrees) |
+| `strike` | NP1 strike angle (degrees) |
+| `dip` | NP1 dip angle (degrees) |
+| `scalar_moment` | Scalar seismic moment M₀ (dyne-cm) |
+| `centroid_depth` | GCMT centroid depth (km) |
+| `match_confidence` | `proximity` (matched) or `null` (no match) |
+
+Mechanism classification uses rake angle: thrust ∈ [45°, 135°], normal ∈ [−135°, −45°], strike-slip covers the rest. Mw is computed from the GCMT scalar moment for magnitude matching.
+
 ## Tests
 
 ```bash

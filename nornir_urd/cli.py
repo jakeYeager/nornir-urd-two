@@ -21,6 +21,8 @@ from .ocean import (
     load_pb2002_vertices,
 )
 from .pb2002 import parse_pb2002_steps, write_pb2002_types
+from .gcmt import APPEND_FIELDNAMES as GCMT_FIELDNAMES
+from .gcmt import MATCH_NULL, load_gcmt_dir, match_events
 from .reasenberg import decluster_reasenberg
 from .usgs import fetch_earthquakes
 
@@ -228,6 +230,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="Distance threshold (km): events within this are continental (default: 50)",
     )
 
+    # --- focal-join --------------------------------------------------------
+    fj = sub.add_parser(
+        "focal-join",
+        help="Join GCMT focal mechanism data to ISC-GEM catalog",
+    )
+    fj.add_argument(
+        "--input", required=True,
+        help="Input CSV; must have usgs_id, event_at, latitude, longitude, usgs_mag",
+    )
+    fj.add_argument(
+        "--output", required=True,
+        help="Output CSV (all input columns retained; GCMT columns appended)",
+    )
+    fj.add_argument(
+        "--gcmt-dir", default="lib/gcmt/",
+        help="Directory containing GCMT .ndk files (default: lib/gcmt/)",
+    )
+    fj.add_argument(
+        "--time-tol", type=float, default=60.0,
+        help="Time match tolerance in seconds (default: 60)",
+    )
+    fj.add_argument(
+        "--dist-km", type=float, default=50.0,
+        help="Distance match tolerance in km (default: 50)",
+    )
+    fj.add_argument(
+        "--mag-tol", type=float, default=0.3,
+        help="Magnitude match tolerance (default: 0.3)",
+    )
+
     # --- window ------------------------------------------------------------
     window_p = sub.add_parser(
         "window",
@@ -420,6 +452,39 @@ def _run_ocean_class(args: argparse.Namespace) -> None:
     print(f"Wrote {len(results)} classified events to {args.output}")
 
 
+def _run_focal_join(args: argparse.Namespace) -> None:
+    with open(args.input, newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        required = {"usgs_id", "event_at", "latitude", "longitude", "usgs_mag"}
+        missing = required - set(fieldnames)
+        if missing:
+            print(f"Error: input CSV missing required columns: {', '.join(sorted(missing))}")
+            sys.exit(1)
+        events = list(reader)
+
+    gcmt_records = load_gcmt_dir(args.gcmt_dir)
+    if not gcmt_records:
+        print(f"Warning: no .ndk files found in {args.gcmt_dir}")
+
+    results = match_events(
+        events,
+        gcmt_records,
+        time_tol_s=args.time_tol,
+        dist_km=args.dist_km,
+        mag_tol=args.mag_tol,
+    )
+
+    out_fieldnames = fieldnames + GCMT_FIELDNAMES
+    with open(args.output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=out_fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(results)
+
+    matched = sum(1 for r in results if r.get("match_confidence") != MATCH_NULL)
+    print(f"Wrote {len(results)} events ({matched} matched) to {args.output}")
+
+
 def _run_window(args: argparse.Namespace) -> None:
     with open(args.input, newline="") as f:
         reader = csv.DictReader(f)
@@ -470,6 +535,8 @@ def main(argv: list[str] | None = None) -> None:
         _run_parse_pb2002(args)
     elif args.command == "ocean-class":
         _run_ocean_class(args)
+    elif args.command == "focal-join":
+        _run_focal_join(args)
     elif args.command == "window":
         _run_window(args)
     else:
