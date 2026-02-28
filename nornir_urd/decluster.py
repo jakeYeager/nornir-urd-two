@@ -8,8 +8,27 @@ from __future__ import annotations
 
 import math
 from datetime import datetime, timezone
+from typing import Callable
 
 EARTH_RADIUS_KM = 6371.0
+
+# Discrete lookup table from Gardner & Knopoff (1974), Table 1.
+# Each row: (minimum magnitude, spatial window km, temporal window days).
+# Rows are ordered descending so the first matching threshold is used.
+# NOTE: Verify these values against the original 1974 paper before use in
+# production analysis. The continuous formula in gk_window() is independent.
+_GK_TABLE: list[tuple[float, float, float]] = [
+    (7.0, 70.0, 985.0),
+    (6.5, 61.0, 960.0),
+    (6.0, 54.0, 915.0),
+    (5.5, 47.0, 790.0),
+    (5.0, 40.0, 510.0),
+    (4.5, 35.0, 290.0),
+    (4.0, 30.0, 155.0),
+    (3.5, 26.0,  83.0),
+    (3.0, 22.5,  42.0),
+    (2.5, 19.5,  22.0),
+]
 
 
 def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -44,6 +63,23 @@ def gk_window(magnitude: float) -> tuple[float, float]:
     return distance_km, time_days
 
 
+def gk_window_table(magnitude: float) -> tuple[float, float]:
+    """Return G-K (1974) space and time windows using the discrete lookup table.
+
+    Uses the original table values from Gardner & Knopoff (1974) directly,
+    NOT the continuous empirical formula used by gk_window(). Returns the
+    window row for the highest magnitude threshold that does not exceed the
+    event magnitude. Events below M=2.5 use the M=2.5 row as a floor.
+
+    Returns:
+        (distance_km, time_days)
+    """
+    for threshold, dist_km, time_days in _GK_TABLE:
+        if magnitude >= threshold:
+            return dist_km, time_days
+    return 19.5, 22.0  # M < 2.5: apply M=2.5 row as floor
+
+
 def gk_window_scaled(magnitude: float, scale: float) -> tuple[float, float]:
     """Return G-K (1974) space and time windows multiplied by *scale*.
 
@@ -59,32 +95,30 @@ def _parse_event_time(event_at: str) -> datetime:
     return datetime.fromisoformat(event_at.replace("Z", "+00:00"))
 
 
-def decluster_gardner_knopoff(
+def _gk_decluster_core(
     events: list[dict],
+    window_fn: Callable[[float], tuple[float, float]],
 ) -> tuple[list[dict], list[dict]]:
-    """Decluster a catalog using the Gardner-Knopoff (1974) algorithm.
+    """Core G-K declustering with a pluggable window function.
 
-    Each event dict must contain at minimum:
-        event_at  -- ISO 8601 timestamp (str)
-        latitude  -- float
-        longitude -- float
-        usgs_mag  -- float
+    Processes events in descending magnitude order. For each mainshock
+    candidate, flags all spatially and temporally proximate smaller events
+    as dependent (aftershock/foreshock).
 
-    Any additional keys are preserved in the output.
+    Args:
+        events:    List of event dicts with event_at, latitude, longitude,
+                   usgs_mag (numeric).
+        window_fn: Callable(magnitude) -> (dist_km, time_days).
 
     Returns:
-        (mainshocks, aftershocks) -- two lists of event dicts.
+        (mainshocks, aftershocks)
     """
     if not events:
         return [], []
 
     n = len(events)
-
-    # Pre-compute datetimes and sort indices by magnitude descending
     times = [_parse_event_time(e["event_at"]) for e in events]
     indices_by_mag = sorted(range(n), key=lambda i: events[i]["usgs_mag"], reverse=True)
-
-    # Track which events are flagged as dependent (aftershock/foreshock)
     is_dependent = [False] * n
 
     for idx in indices_by_mag:
@@ -95,13 +129,12 @@ def decluster_gardner_knopoff(
         lat = events[idx]["latitude"]
         lon = events[idx]["longitude"]
         t = times[idx]
-        dist_window, time_window = gk_window(mag)
+        dist_window, time_window = window_fn(mag)
         time_window_secs = time_window * 86400.0
 
         for j in range(n):
             if j == idx or is_dependent[j]:
                 continue
-            # Only flag smaller-or-equal magnitude events
             if events[j]["usgs_mag"] > mag:
                 continue
 
@@ -116,6 +149,75 @@ def decluster_gardner_knopoff(
     mainshocks = [e for i, e in enumerate(events) if not is_dependent[i]]
     aftershocks = [e for i, e in enumerate(events) if is_dependent[i]]
     return mainshocks, aftershocks
+
+
+def decluster_gardner_knopoff(
+    events: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    """Decluster a catalog using the Gardner-Knopoff (1974) continuous formula.
+
+    Each event dict must contain at minimum:
+        event_at  -- ISO 8601 timestamp (str)
+        latitude  -- float
+        longitude -- float
+        usgs_mag  -- float
+
+    Any additional keys are preserved in the output.
+
+    Returns:
+        (mainshocks, aftershocks) -- two lists of event dicts.
+    """
+    return _gk_decluster_core(events, gk_window)
+
+
+def decluster_gardner_knopoff_table(
+    events: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    """Decluster using the G-K (1974) discrete lookup table (not the formula).
+
+    Identical algorithm to decluster_gardner_knopoff but uses gk_window_table()
+    for spatial and temporal windows. The table values are taken directly from
+    Gardner & Knopoff (1974) and differ from the continuous formula, particularly
+    for the temporal window at M < 6.5.
+
+    Each event dict must contain at minimum:
+        event_at  -- ISO 8601 timestamp (str)
+        latitude  -- float
+        longitude -- float
+        usgs_mag  -- float
+
+    Returns:
+        (mainshocks, aftershocks) -- two lists of event dicts.
+    """
+    return _gk_decluster_core(events, gk_window_table)
+
+
+def decluster_a1b_fixed(
+    events: list[dict],
+    radius_km: float = 83.2,
+    window_days: float = 95.6,
+) -> tuple[list[dict], list[dict]]:
+    """Decluster using A1b-informed fixed spatial and temporal windows.
+
+    Applies a constant spatial radius and temporal window to all magnitudes,
+    independent of event size. The default values (83.2 km, 95.6 days) are
+    derived from the A1b analysis case.
+
+    Each event dict must contain at minimum:
+        event_at  -- ISO 8601 timestamp (str)
+        latitude  -- float
+        longitude -- float
+        usgs_mag  -- float
+
+    Args:
+        events:      List of event dicts.
+        radius_km:   Fixed spatial radius in km (default: 83.2).
+        window_days: Fixed temporal window in days (default: 95.6).
+
+    Returns:
+        (mainshocks, aftershocks) -- two lists of event dicts.
+    """
+    return _gk_decluster_core(events, lambda _mag: (radius_km, window_days))
 
 
 def decluster_with_parents(
