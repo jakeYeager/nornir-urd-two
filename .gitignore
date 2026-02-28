@@ -5,9 +5,11 @@ lib/*.dat
 lib/*.dig
 lib/gcmt/*.*
 
-# Collected earthquake data (keep the directory, ignore CSVs & notes)
-data/output/*.csv
-data/output/*.md
+# Collected earthquake data (keep the directory, ignore any files inside)
+data/output/*.*
+
+# Collected earthquake data (keep the directory, ignore any files inside)
+data/output/iscgem/*.*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
