@@ -260,6 +260,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Magnitude match tolerance (default: 0.3)",
     )
 
+    # --- solar-geometry ----------------------------------------------------
+    sg = sub.add_parser(
+        "solar-geometry",
+        help="Append solar declination, declination rate, and Earth-Sun distance to a catalog",
+    )
+    sg.add_argument(
+        "--input", required=True,
+        help="Input CSV; must have usgs_id and event_at",
+    )
+    sg.add_argument(
+        "--output", required=True,
+        help="Output CSV (all input columns retained; solar geometry columns appended)",
+    )
+
     # --- window ------------------------------------------------------------
     window_p = sub.add_parser(
         "window",
@@ -452,6 +466,35 @@ def _run_ocean_class(args: argparse.Namespace) -> None:
     print(f"Wrote {len(results)} classified events to {args.output}")
 
 
+_SOLAR_GEOMETRY_COLUMNS = ["solar_declination", "declination_rate", "earth_sun_distance"]
+
+
+def _run_solar_geometry(args: argparse.Namespace) -> None:
+    with open(args.input, newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        missing = {"usgs_id", "event_at"} - set(fieldnames)
+        if missing:
+            print(f"Error: input CSV missing required columns: {', '.join(sorted(missing))}")
+            sys.exit(1)
+        events = list(reader)
+
+    out_fieldnames = fieldnames + _SOLAR_GEOMETRY_COLUMNS
+    with open(args.output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=out_fieldnames)
+        writer.writeheader()
+        for ev in events:
+            event_at = datetime.fromisoformat(ev["event_at"].replace("Z", "+00:00"))
+            dec, rate, dist = astro.solar_geometry(event_at)
+            row = dict(ev)
+            row["solar_declination"] = round(dec, 6)
+            row["declination_rate"] = round(rate, 6)
+            row["earth_sun_distance"] = round(dist, 6)
+            writer.writerow(row)
+
+    print(f"Wrote {len(events)} events to {args.output}")
+
+
 def _run_focal_join(args: argparse.Namespace) -> None:
     with open(args.input, newline="") as f:
         reader = csv.DictReader(f)
@@ -537,6 +580,8 @@ def main(argv: list[str] | None = None) -> None:
         _run_ocean_class(args)
     elif args.command == "focal-join":
         _run_focal_join(args)
+    elif args.command == "solar-geometry":
+        _run_solar_geometry(args)
     elif args.command == "window":
         _run_window(args)
     else:

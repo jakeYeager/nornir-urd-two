@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import bisect
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from skyfield import almanac
@@ -103,6 +103,41 @@ def lunar_secs(event_at: datetime, new_moon_table: list[datetime]) -> int:
     preceding_new_moon = new_moon_table[idx]
     delta = event_at - preceding_new_moon
     return int(delta.total_seconds())
+
+
+def solar_geometry(event_at: datetime) -> tuple[float, float, float]:
+    """Compute solar geometry metrics for a single event time.
+
+    Returns a ``(solar_declination, declination_rate, earth_sun_distance)``
+    tuple:
+
+    - ``solar_declination``: Sun's apparent declination in degrees (−23.5 to +23.5).
+    - ``declination_rate``: Rate of change of declination (degrees/day),
+      computed as a central finite difference over a ±0.5-day interval.
+    - ``earth_sun_distance``: Earth-Sun distance in astronomical units
+      (~0.983 at perihelion, ~1.017 at aphelion).
+
+    The Skyfield DE421 ephemeris is loaded from ``lib/de421.bsp`` (cached
+    after first access, so successive calls are inexpensive).
+    """
+    if event_at.tzinfo is None:
+        event_at = event_at.replace(tzinfo=timezone.utc)
+
+    ts, eph = _load_ephemeris()
+    earth = eph["earth"]
+    sun = eph["sun"]
+
+    def _dec_dist(dt: datetime) -> tuple[float, float]:
+        t = ts.from_datetime(dt)
+        _, dec, dist = earth.at(t).observe(sun).apparent().radec()
+        return dec.degrees, dist.au
+
+    dec, dist = _dec_dist(event_at)
+    dec_plus, _ = _dec_dist(event_at + timedelta(days=0.5))
+    dec_minus, _ = _dec_dist(event_at - timedelta(days=0.5))
+    rate = dec_plus - dec_minus  # degrees/day (central diff over 1.0-day span)
+
+    return dec, rate, dist
 
 
 def midnight_secs(event_at: datetime, longitude: float) -> int:

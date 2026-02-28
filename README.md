@@ -283,6 +283,29 @@ Output retains all input columns plus eight GCMT columns appended:
 
 Mechanism classification uses rake angle: thrust ∈ [45°, 135°], normal ∈ [−135°, −45°], strike-slip covers the rest. Mw is computed from the GCMT scalar moment for magnitude matching.
 
+### Solar geometry
+
+Append three ephemeris-derived columns to a catalog using the DE421 ephemeris already present at `lib/de421.bsp`. No additional data is required.
+
+```bash
+uv run python -m nornir_urd solar-geometry \
+  --input data/output/global_events.csv \
+  --output data/output/solar_geometry.csv
+```
+
+| Option | Description |
+| --- | --- |
+| `--input FILE` | Input CSV; must have `usgs_id` and `event_at` |
+| `--output FILE` | Output CSV (all input columns retained; three new columns appended) |
+
+The three appended columns:
+
+| Column | Units | Range | Description |
+| --- | --- | --- | --- |
+| `solar_declination` | degrees | −23.5 to +23.5 | Sun's apparent declination at event time |
+| `declination_rate` | degrees/day | ~−0.40 to +0.40 | Rate of change of declination (central finite difference, ±0.5 day) |
+| `earth_sun_distance` | AU | ~0.983 to ~1.017 | Earth-Sun distance; minimum near January perihelion, maximum near July aphelion |
+
 ## Tests
 
 ```bash
