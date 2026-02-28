@@ -19,12 +19,12 @@
 
 ## Phase Sequence
 
-| Phase | Serves Cases | REQ(s) | Priority |
-|---|---|---|---|
-| 1 | A4, A1 | REQ-1 | Critical |
-| 2 | B2 | REQ-2, REQ-5 | Medium |
-| 3 | B3 | REQ-4, REQ-5 (data only) | Medium |
-| 4 | B5 | REQ-3 | Low |
+| Phase | Serves Cases | REQ(s) | Priority | Status |
+|---|---|---|---|---|
+| 1 | A4, A1 | REQ-1 | Critical | **Complete** (commit 6159572) |
+| 2 | B2 | REQ-2, REQ-5 | Medium | **Complete** |
+| 3 | B3 | REQ-4, REQ-5 (data only) | Medium | Pending |
+| 4 | B5 | REQ-3 | Low | Pending |
 
 **Cases with no pipeline work** (derivable at analysis time): B6 (raw catalog already at `data/output/iscgem_global_events.csv`), B1, A3, B4, A2.
 

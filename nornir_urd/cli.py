@@ -14,6 +14,13 @@ from .decluster import (
     decluster_gardner_knopoff_table,
     decluster_with_parents,
 )
+from .ocean import (
+    OUTPUT_FIELDNAMES as OCEAN_FIELDNAMES,
+    classify_events,
+    load_coastline_vertices,
+    load_pb2002_vertices,
+)
+from .pb2002 import parse_pb2002_steps, write_pb2002_types
 from .reasenberg import decluster_reasenberg
 from .usgs import fetch_earthquakes
 
@@ -166,6 +173,59 @@ def build_parser() -> argparse.ArgumentParser:
     da1b.add_argument(
         "--window", type=float, default=95.6,
         help="Fixed temporal window in days applied to all magnitudes (default: 95.6)",
+    )
+
+    # --- parse-pb2002 ------------------------------------------------------
+    ppb = sub.add_parser(
+        "parse-pb2002",
+        help="Parse pb2002_steps.dat into a boundary-segment type lookup CSV",
+    )
+    ppb.add_argument(
+        "--steps", default="lib/pb2002_steps.dat",
+        help="Path to pb2002_steps.dat (default: lib/pb2002_steps.dat)",
+    )
+    ppb.add_argument(
+        "--output", default="lib/pb2002_types.csv",
+        help="Output CSV path (default: lib/pb2002_types.csv)",
+    )
+
+    # --- ocean-class -------------------------------------------------------
+    oc = sub.add_parser(
+        "ocean-class",
+        help="Classify ISC-GEM events as oceanic, continental, or transitional",
+    )
+    oc.add_argument(
+        "--input", required=True,
+        help="Input CSV; must have usgs_id, latitude, longitude",
+    )
+    oc.add_argument(
+        "--output", required=True,
+        help="Output CSV (usgs_id, ocean_class, dist_to_coast_km)",
+    )
+    oc.add_argument(
+        "--method", default="ne", choices=["ne", "gshhg", "pb2002"],
+        help=(
+            "Coastline data source: 'ne' (Natural Earth vertex CSV, default), "
+            "'gshhg' (GSHHG vertex CSV), 'pb2002' (PB2002 boundary proxy)"
+        ),
+    )
+    oc.add_argument(
+        "--coastline", default="lib/ne_coastline_vertices.csv",
+        help="Path to coastline vertex CSV for ne/gshhg methods "
+             "(default: lib/ne_coastline_vertices.csv)",
+    )
+    oc.add_argument(
+        "--pb2002-types", default="lib/pb2002_types.csv",
+        help="Path to pb2002_types.csv for pb2002 method "
+             "(default: lib/pb2002_types.csv)",
+    )
+    oc.add_argument(
+        "--oceanic-km", type=float, default=200.0,
+        help="Distance threshold (km): events beyond this are oceanic (default: 200)",
+    )
+    oc.add_argument(
+        "--coastal-km", type=float, default=50.0,
+        help="Distance threshold (km): events within this are continental (default: 50)",
     )
 
     # --- window ------------------------------------------------------------
@@ -325,6 +385,41 @@ def _run_decluster_a1b(args: argparse.Namespace) -> None:
     _write_mainshocks_aftershocks(args, fieldnames, mainshocks, aftershocks)
 
 
+def _run_parse_pb2002(args: argparse.Namespace) -> None:
+    rows = parse_pb2002_steps(args.steps)
+    write_pb2002_types(rows, args.output)
+    print(f"Wrote {len(rows)} boundary segments to {args.output}")
+
+
+def _run_ocean_class(args: argparse.Namespace) -> None:
+    with open(args.input, newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        missing = {"usgs_id", "latitude", "longitude"} - set(fieldnames)
+        if missing:
+            print(f"Error: input CSV missing required columns: {', '.join(sorted(missing))}")
+            sys.exit(1)
+        events = list(reader)
+
+    if args.method == "pb2002":
+        vertices = load_pb2002_vertices(args.pb2002_types)
+    else:
+        vertices = load_coastline_vertices(args.coastline)
+
+    results = classify_events(
+        events,
+        vertices,
+        oceanic_km=args.oceanic_km,
+        coastal_km=args.coastal_km,
+    )
+
+    with open(args.output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=OCEAN_FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(results)
+    print(f"Wrote {len(results)} classified events to {args.output}")
+
+
 def _run_window(args: argparse.Namespace) -> None:
     with open(args.input, newline="") as f:
         reader = csv.DictReader(f)
@@ -371,6 +466,10 @@ def main(argv: list[str] | None = None) -> None:
         _run_decluster_reasenberg(args)
     elif args.command == "decluster-a1b":
         _run_decluster_a1b(args)
+    elif args.command == "parse-pb2002":
+        _run_parse_pb2002(args)
+    elif args.command == "ocean-class":
+        _run_ocean_class(args)
     elif args.command == "window":
         _run_window(args)
     else:

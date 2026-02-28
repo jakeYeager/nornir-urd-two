@@ -158,6 +158,93 @@ When two mainshock windows overlap and both could claim the same event, the pare
 
 The mainshock output is identical in format to `decluster` — original columns only, no attribution metadata.
 
+### Decluster variants
+
+Two additional declustering subcommands are available:
+
+**`decluster-table`** — Uses the discrete G-K (1974) lookup table instead of the continuous empirical formula. Accepts the same arguments as `decluster`.
+
+```bash
+uv run python -m nornir_urd decluster-table \
+  --input data/output/global_events.csv \
+  --mainshocks data/output/mainshocks_table.csv \
+  --aftershocks data/output/aftershocks_table.csv
+```
+
+**`decluster-reasenberg`** — Reasenberg (1985) interaction-based clustering algorithm.
+
+```bash
+uv run python -m nornir_urd decluster-reasenberg \
+  --input data/output/global_events.csv \
+  --mainshocks data/output/mainshocks_reas.csv \
+  --aftershocks data/output/aftershocks_reas.csv
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--rfact FLOAT` | `10` | Interaction radius scale factor |
+| `--tau-min FLOAT` | `1.0` | Minimum cluster lookback window (days) |
+| `--tau-max FLOAT` | `10.0` | Maximum cluster lookback window (days) |
+| `--p-value FLOAT` | `0.95` | Omori decay probability threshold |
+| `--xmeff FLOAT` | `1.5` | Effective magnitude threshold |
+
+**`decluster-a1b`** — Fixed spatial-temporal window declustering using A1b-informed defaults (83.2 km radius, 95.6-day window, applied uniformly to all magnitudes).
+
+```bash
+uv run python -m nornir_urd decluster-a1b \
+  --input data/output/global_events.csv \
+  --mainshocks data/output/mainshocks_a1b.csv \
+  --aftershocks data/output/aftershocks_a1b.csv
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--radius FLOAT` | `83.2` | Fixed spatial radius (km) for all magnitudes |
+| `--window FLOAT` | `95.6` | Fixed temporal window (days) for all magnitudes |
+
+### Ocean/continent classification
+
+Classify events as `oceanic`, `continental`, or `transitional` based on distance to the nearest coastline vertex.
+
+#### Required data
+
+**Coastline vertex CSV** — Convert the Natural Earth `ne_10m_coastline` shapefile to a two-column `lon,lat` CSV and place it at `lib/ne_coastline_vertices.csv`. Using Python with the `shapefile` package (pyshp):
+
+```python
+import shapefile, csv
+sf = shapefile.Reader("ne_10m_coastline.shp")
+with open("lib/ne_coastline_vertices.csv", "w", newline="") as f:
+    w = csv.writer(f)
+    for shape in sf.shapes():
+        w.writerows(shape.points)
+```
+
+**PB2002 steps file** (optional, for `--method pb2002`) — Download `pb2002_steps.dat` from the [PB2002 publication page](https://peterbird.name/publications/2003_PB2002/2003_PB2002.htm) and place it at `lib/pb2002_steps.dat`. Then generate the types lookup CSV:
+
+```bash
+uv run python -m nornir_urd parse-pb2002 \
+  --steps lib/pb2002_steps.dat \
+  --output lib/pb2002_types.csv
+```
+
+#### Running classification
+
+```bash
+uv run python -m nornir_urd ocean-class \
+  --input data/output/global_events.csv \
+  --output data/output/ocean_class.csv
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--method` | `ne` | Coastline source: `ne` (Natural Earth, recommended), `gshhg` (GSHHG vertex CSV), `pb2002` (PB2002 boundary proxy) |
+| `--coastline FILE` | `lib/ne_coastline_vertices.csv` | Vertex CSV path (used by `ne` and `gshhg` methods) |
+| `--pb2002-types FILE` | `lib/pb2002_types.csv` | PB2002 types CSV path (used by `pb2002` method) |
+| `--oceanic-km FLOAT` | `200` | Events farther than this from the coastline are `oceanic` |
+| `--coastal-km FLOAT` | `50` | Events within this distance are `continental`; between is `transitional` |
+
+Output columns: `usgs_id, ocean_class, dist_to_coast_km`
+
 ## Tests
 
 ```bash
