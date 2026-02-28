@@ -1,6 +1,9 @@
 # Skyfield ephemeris data
 *.bsp
 
+# digital model of plate boundaries
+*.dig
+
 # Collected earthquake data (keep the directory, ignore CSVs & notes)
 data/output/*.csv
 data/output/*.md
