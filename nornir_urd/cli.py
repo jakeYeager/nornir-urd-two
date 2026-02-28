@@ -452,11 +452,26 @@ def _run_ocean_class(args: argparse.Namespace) -> None:
     else:
         vertices = load_coastline_vertices(args.coastline)
 
+    total = len(events)
+    print(f"Classifying {total} events against {len(vertices)} coastline vertices ...",
+          file=sys.stderr)
+
+    _last_pct: list[int] = [-1]
+
+    def _progress(current: int, total: int) -> None:
+        pct = (100 * current) // total if total > 0 else 100
+        if pct != _last_pct[0]:
+            _last_pct[0] = pct
+            print(f"\r  {current}/{total} ({pct}%)", end="", flush=True, file=sys.stderr)
+        if current == total:
+            print(file=sys.stderr)
+
     results = classify_events(
         events,
         vertices,
         oceanic_km=args.oceanic_km,
         coastal_km=args.coastal_km,
+        progress=_progress,
     )
 
     with open(args.output, "w", newline="") as f:

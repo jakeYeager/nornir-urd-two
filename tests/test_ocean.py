@@ -1,6 +1,7 @@
 """Tests for nornir_urd.ocean module."""
 
 import csv
+import random
 
 import pytest
 
@@ -8,6 +9,8 @@ from nornir_urd.ocean import (
     CONTINENTAL,
     OCEANIC,
     TRANSITIONAL,
+    _build_sorted_vertex_index,
+    _dist_to_nearest_sorted,
     classify_distance,
     classify_events,
     dist_to_nearest_vertex,
@@ -171,3 +174,96 @@ class TestClassifyEvents:
         events = [self._make_event(f"eq{i}", float(i), 0.0) for i in range(5)]
         results = classify_events(events, [self._COAST_VERTEX])
         assert len(results) == 5
+
+
+# ---------------------------------------------------------------------------
+# _dist_to_nearest_sorted (fast bisect-based path)
+# ---------------------------------------------------------------------------
+
+class TestDistToNearestSorted:
+    def _sorted(self, verts):
+        return _build_sorted_vertex_index(verts)
+
+    def test_empty_returns_inf(self):
+        sv, keys = self._sorted([])
+        assert _dist_to_nearest_sorted(0.0, 0.0, sv, keys) == float("inf")
+
+    def test_zero_distance_to_self(self):
+        sv, keys = self._sorted([(10.0, 20.0)])
+        d = _dist_to_nearest_sorted(20.0, 10.0, sv, keys)
+        assert d == pytest.approx(0.0, abs=1e-6)
+
+    def test_matches_naive_single_vertex(self):
+        verts = [(2.35, 48.85)]  # Paris
+        sv, keys = self._sorted(verts)
+        naive = dist_to_nearest_vertex(51.5, -0.1, verts)
+        fast = _dist_to_nearest_sorted(51.5, -0.1, sv, keys)
+        assert fast == pytest.approx(naive, rel=1e-6)
+
+    def test_matches_naive_random_set(self):
+        rng = random.Random(42)
+        verts = [(rng.uniform(-180, 180), rng.uniform(-90, 90)) for _ in range(200)]
+        lat, lon = 35.0, -120.0
+        naive = dist_to_nearest_vertex(lat, lon, verts)
+        sv, keys = self._sorted(verts)
+        fast = _dist_to_nearest_sorted(lat, lon, sv, keys)
+        assert fast == pytest.approx(naive, rel=1e-6)
+
+    def test_matches_naive_lat_beyond_all_vertices(self):
+        """Query point latitude above every vertex in the list."""
+        verts = [(0.0, -80.0), (10.0, -70.0), (20.0, -60.0)]
+        lat, lon = 89.0, 0.0  # near North Pole
+        naive = dist_to_nearest_vertex(lat, lon, verts)
+        sv, keys = self._sorted(verts)
+        fast = _dist_to_nearest_sorted(lat, lon, sv, keys)
+        assert fast == pytest.approx(naive, rel=1e-6)
+
+    def test_matches_naive_lat_below_all_vertices(self):
+        """Query point latitude below every vertex in the list."""
+        verts = [(0.0, 10.0), (10.0, 20.0), (20.0, 30.0)]
+        lat, lon = -89.0, 0.0  # near South Pole
+        naive = dist_to_nearest_vertex(lat, lon, verts)
+        sv, keys = self._sorted(verts)
+        fast = _dist_to_nearest_sorted(lat, lon, sv, keys)
+        assert fast == pytest.approx(naive, rel=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# classify_events – progress callback
+# ---------------------------------------------------------------------------
+
+class TestClassifyEventsProgress:
+    _COAST_VERTEX = (0.0, 0.0)
+
+    def _make_event(self, usgs_id, lat, lon):
+        return {"usgs_id": usgs_id, "latitude": str(lat), "longitude": str(lon)}
+
+    def test_progress_called_once_per_event(self):
+        calls = []
+        events = [self._make_event(f"eq{i}", float(i), 0.0) for i in range(5)]
+        classify_events(events, [self._COAST_VERTEX], progress=lambda c, t: calls.append((c, t)))
+        assert len(calls) == 5
+
+    def test_progress_current_values_are_sequential(self):
+        calls = []
+        n = 4
+        events = [self._make_event(f"eq{i}", float(i), 0.0) for i in range(n)]
+        classify_events(events, [self._COAST_VERTEX], progress=lambda c, t: calls.append((c, t)))
+        assert [c for c, _ in calls] == list(range(1, n + 1))
+
+    def test_progress_total_is_constant(self):
+        calls = []
+        n = 3
+        events = [self._make_event(f"eq{i}", float(i), 0.0) for i in range(n)]
+        classify_events(events, [self._COAST_VERTEX], progress=lambda c, t: calls.append((c, t)))
+        assert all(t == n for _, t in calls)
+
+    def test_progress_none_does_not_raise(self):
+        events = [self._make_event("eq1", 0.0, 0.0)]
+        results = classify_events(events, [self._COAST_VERTEX], progress=None)
+        assert len(results) == 1
+
+    def test_progress_not_called_for_empty_catalog(self):
+        calls = []
+        classify_events([], [self._COAST_VERTEX], progress=lambda c, t: calls.append((c, t)))
+        assert calls == []
