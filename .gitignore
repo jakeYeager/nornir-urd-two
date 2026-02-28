@@ -1,11 +1,8 @@
-# Skyfield ephemeris data
-*.bsp
-
-# digital model of plate boundaries
-*.dig
-
 # Large generated reference files in lib/
+lib/*.bsp
 lib/*.csv
+lib/*.dat
+lib/*.dig
 
 # Collected earthquake data (keep the directory, ignore CSVs & notes)
 data/output/*.csv

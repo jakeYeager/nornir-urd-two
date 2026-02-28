@@ -219,7 +219,7 @@ with open("lib/ne_coastline_vertices.csv", "w", newline="") as f:
         w.writerows(shape.points)
 ```
 
-**PB2002 steps file** (optional, for `--method pb2002`) — Download `pb2002_steps.dat` from the [PB2002 publication page](https://peterbird.name/publications/2003_PB2002/2003_PB2002.htm) and place it at `lib/pb2002_steps.dat`. Then generate the types lookup CSV:
+**PB2002 steps file** (optional, for `--method pb2002`) — Download `pb2002_steps.dat` from the [PB2002 publication page](http://peterbird.name/oldftp/PB2002/) and place it at `lib/pb2002_steps.dat`. Then generate the types lookup CSV:
 
 ```bash
 uv run python -m nornir_urd parse-pb2002 \
