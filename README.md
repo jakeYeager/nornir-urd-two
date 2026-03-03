@@ -99,10 +99,11 @@ uv run python -m nornir_urd decluster \
 
 #### Declustering existing CSVs
 
-The `decluster` command works on any CSV file, not just output from the `collect` command. The input CSV must contain these columns:
+All declustering commands work on any CSV file, not just output from the `collect` command. The input CSV must contain these columns:
 
 | Required column | Description                                      |
 | --------------- | ------------------------------------------------ |
+| `usgs_id`       | Unique event identifier (string)                 |
 | `event_at`      | ISO 8601 timestamp (e.g. `2026-01-15T12:00:00Z`) |
 | `latitude`      | Event latitude (float)                           |
 | `longitude`     | Event longitude (float)                          |
@@ -121,6 +122,32 @@ The implementation uses the Gardner-Knopoff (1974) empirical formulas for magnit
 Distances are computed using the Haversine formula (spherical Earth, radius 6371 km). This introduces a minor approximation versus the WGS84 ellipsoid -- maximum error is ~0.3% (~0.5 km at the equator for a 150 km distance). At the spatial scales of the G-K windows (tens to hundreds of km), this is negligible relative to the uncertainty in the window parameters themselves.
 
 The algorithm has O(n^2) time complexity (pairwise event comparison). This is efficient for catalogs up to ~50,000 events. For M6.0+ global catalogs (~100-200 events/year), runtime is effectively instant.
+
+#### Aftershock output columns
+
+The aftershock CSV retains all input columns plus four attribution columns appended at the end:
+
+| Column             | Description                                                                    |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `parent_id`        | `usgs_id` of the mainshock whose window claimed this event                     |
+| `parent_magnitude` | Magnitude of the parent mainshock                                              |
+| `delta_t_sec`      | Signed elapsed seconds from the parent to this event (negative for foreshocks) |
+| `delta_dist_km`    | Great-circle distance in km between this event and its parent                  |
+
+When two mainshock windows overlap and both could claim the same event, the parent is the mainshock with the smallest `|delta_t_sec|` (temporal proximity takes priority over spatial proximity).
+
+#### Mainshock output columns
+
+The mainshock CSV retains all input columns plus four summary columns appended at the end:
+
+| Column             | Description                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| `foreshock_count`  | Number of claimed events with `delta_t_sec < 0` (occurred before the mainshock)         |
+| `aftershock_count` | Number of claimed events with `delta_t_sec >= 0` (occurred at or after the mainshock)   |
+| `window_secs`      | Maximum `\|delta_t_sec\|` observed across all claimed events (seconds)                  |
+| `window_km`        | Maximum `delta_dist_km` observed across all claimed events (km)                         |
+
+`window_secs` and `window_km` reflect the observed maximum temporal and spatial reach across all events claimed by that mainshock. For the G-K formula this equals the algorithm's theoretical window at the mainshock's magnitude. Mainshocks with no claimed events have `window_secs = 0` and `window_km = 0`.
 
 ### Window
 
@@ -156,7 +183,7 @@ The aftershock CSV contains all columns from the input plus four attribution col
 
 When two mainshock windows overlap and both could claim the same event, the parent is the mainshock with the smallest `|delta_t_sec|` (temporal proximity takes priority over spatial proximity).
 
-The mainshock output is identical in format to `decluster` — original columns only, no attribution metadata.
+The mainshock CSV retains all input columns plus the same four summary columns described in the `decluster` section above (`foreshock_count`, `aftershock_count`, `window_secs`, `window_km`).
 
 ### Decluster variants
 
@@ -188,6 +215,8 @@ uv run python -m nornir_urd decluster-reasenberg \
 | `--p-value FLOAT` | `0.95` | Omori decay probability threshold |
 | `--xmeff FLOAT` | `1.5` | Effective magnitude threshold |
 
+Both the aftershock CSV and mainshock CSV include the same attribution and summary columns described in the `decluster` section above. For Reasenberg, each aftershock's parent is the highest-magnitude event in its cluster; no tie-breaking is required since each event belongs to exactly one cluster. `window_secs` and `window_km` on each mainshock row report the actual maximum temporal and spatial reach observed across its claimed events — Reasenberg's interaction radius and adaptive lookback window vary dynamically, so these observed maximums provide the most meaningful per-mainshock footprint.
+
 **`decluster-a1b`** — Fixed spatial-temporal window declustering using A1b-informed defaults (83.2 km radius, 95.6-day window, applied uniformly to all magnitudes).
 
 ```bash
@@ -201,6 +230,8 @@ uv run python -m nornir_urd decluster-a1b \
 | --- | --- | --- |
 | `--radius FLOAT` | `83.2` | Fixed spatial radius (km) for all magnitudes |
 | `--window FLOAT` | `95.6` | Fixed temporal window (days) for all magnitudes |
+
+Both the aftershock CSV and mainshock CSV include the same attribution and summary columns described in the `decluster` section above.
 
 ### Ocean/continent classification
 

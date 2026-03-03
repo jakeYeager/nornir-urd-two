@@ -143,13 +143,32 @@ def decluster_reasenberg(
     # Classify: within each multi-event cluster the highest-magnitude event
     # is the mainshock; all others are aftershocks/foreshocks.
     is_dependent = [False] * n
+    cluster_main: list[int | None] = [None] * n  # maps sorted index → cluster main_si
     for _mmax, main_si, _last_si, members in clusters:
         if len(members) == 1:
             continue
         for si in members:
+            cluster_main[si] = main_si
             if si != main_si:
                 is_dependent[si] = True
 
     mainshocks = [sorted_evts[i] for i in range(n) if not is_dependent[i]]
-    aftershocks = [sorted_evts[i] for i in range(n) if is_dependent[i]]
+    aftershocks = []
+    for i in range(n):
+        if not is_dependent[i]:
+            continue
+        main_si = cluster_main[i]
+        parent = sorted_evts[main_si]
+        dt_sec = (times[i] - times[main_si]).total_seconds()
+        dist_km = haversine_km(
+            float(parent["latitude"]), float(parent["longitude"]),
+            float(sorted_evts[i]["latitude"]), float(sorted_evts[i]["longitude"]),
+        )
+        after_event = dict(sorted_evts[i])
+        after_event["parent_id"] = parent["usgs_id"]
+        after_event["parent_magnitude"] = parent["usgs_mag"]
+        after_event["delta_t_sec"] = dt_sec
+        after_event["delta_dist_km"] = dist_km
+        aftershocks.append(after_event)
+
     return mainshocks, aftershocks

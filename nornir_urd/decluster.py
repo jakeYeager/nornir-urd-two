@@ -220,6 +220,153 @@ def decluster_a1b_fixed(
     return _gk_decluster_core(events, lambda _mag: (radius_km, window_days))
 
 
+def _gk_decluster_with_parents_core(
+    events: list[dict],
+    window_fn: Callable[[float], tuple[float, float]],
+) -> tuple[list[dict], list[dict]]:
+    """Core G-K declustering with parent attribution and a pluggable window function.
+
+    Processes events in descending magnitude order. For each mainshock candidate,
+    all spatially and temporally proximate smaller events are flagged as dependent.
+    When two mainshock windows overlap and both could claim the same event, the
+    parent is the mainshock with the smallest |delta_t_sec| (temporal proximity).
+
+    Each dependent event dict is extended with four attribution columns:
+        parent_id        -- usgs_id of the triggering mainshock
+        parent_magnitude -- usgs_mag of the triggering mainshock
+        delta_t_sec      -- signed elapsed seconds from parent to this event
+                           (negative when this event precedes the parent)
+        delta_dist_km    -- great-circle distance in km between this event and its parent
+
+    Args:
+        events:    List of event dicts; must contain event_at, latitude,
+                   longitude, usgs_id, usgs_mag (numeric).
+        window_fn: Callable(magnitude) -> (dist_km, time_days).
+
+    Returns:
+        (mainshocks, aftershocks) -- mainshocks are unmodified event dicts;
+        aftershock dicts carry the four extra attribution keys.
+    """
+    if not events:
+        return [], []
+
+    n = len(events)
+    times = [_parse_event_time(e["event_at"]) for e in events]
+    indices_by_mag = sorted(range(n), key=lambda i: events[i]["usgs_mag"], reverse=True)
+
+    is_dependent = [False] * n
+    parent_idx: list[int | None] = [None] * n
+    parent_dt_abs = [float("inf")] * n  # |delta_t_sec| for current best parent
+
+    for idx in indices_by_mag:
+        if is_dependent[idx]:
+            continue
+
+        mag = events[idx]["usgs_mag"]
+        lat = events[idx]["latitude"]
+        lon = events[idx]["longitude"]
+        t = times[idx]
+        dist_window, time_window = window_fn(mag)
+        time_window_secs = time_window * 86400.0
+
+        for j in range(n):
+            if j == idx:
+                continue
+            if events[j]["usgs_mag"] > mag:
+                continue
+
+            dt_abs = abs((times[j] - t).total_seconds())
+            if dt_abs > time_window_secs:
+                continue
+
+            dist = haversine_km(lat, lon, events[j]["latitude"], events[j]["longitude"])
+            if dist > dist_window:
+                continue
+
+            if not is_dependent[j]:
+                is_dependent[j] = True
+                parent_idx[j] = idx
+                parent_dt_abs[j] = dt_abs
+            elif dt_abs < parent_dt_abs[j]:
+                parent_idx[j] = idx
+                parent_dt_abs[j] = dt_abs
+
+    mainshocks = [e for i, e in enumerate(events) if not is_dependent[i]]
+    aftershocks = []
+    for i, e in enumerate(events):
+        if not is_dependent[i]:
+            continue
+        p = parent_idx[i]
+        parent = events[p]
+        dt_sec = (times[i] - times[p]).total_seconds()
+        dist_km = haversine_km(
+            parent["latitude"], parent["longitude"],
+            e["latitude"], e["longitude"],
+        )
+        after_event = dict(e)
+        after_event["parent_id"] = parent["usgs_id"]
+        after_event["parent_magnitude"] = parent["usgs_mag"]
+        after_event["delta_t_sec"] = dt_sec
+        after_event["delta_dist_km"] = dist_km
+        aftershocks.append(after_event)
+
+    return mainshocks, aftershocks
+
+
+def decluster_gardner_knopoff_with_parents(
+    events: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    """Decluster using G-K (1974) continuous formula with per-aftershock parent attribution.
+
+    Each event dict must contain at minimum:
+        event_at  -- ISO 8601 timestamp (str)
+        latitude  -- float
+        longitude -- float
+        usgs_id   -- str
+        usgs_mag  -- float
+
+    Any additional keys are preserved in the output.
+
+    Returns:
+        (mainshocks, aftershocks) -- mainshocks are unmodified event dicts;
+        aftershock dicts carry four extra attribution keys (parent_id,
+        parent_magnitude, delta_t_sec, delta_dist_km).
+    """
+    return _gk_decluster_with_parents_core(events, gk_window)
+
+
+def decluster_a1b_with_parents(
+    events: list[dict],
+    radius_km: float = 83.2,
+    window_days: float = 95.6,
+) -> tuple[list[dict], list[dict]]:
+    """Decluster using A1b-informed fixed windows with per-aftershock parent attribution.
+
+    Applies a constant spatial radius and temporal window to all magnitudes.
+    The default values (83.2 km, 95.6 days) are derived from the A1b analysis case.
+
+    Each event dict must contain at minimum:
+        event_at  -- ISO 8601 timestamp (str)
+        latitude  -- float
+        longitude -- float
+        usgs_id   -- str
+        usgs_mag  -- float
+
+    Any additional keys are preserved in the output.
+
+    Args:
+        events:      List of event dicts.
+        radius_km:   Fixed spatial radius in km (default: 83.2).
+        window_days: Fixed temporal window in days (default: 95.6).
+
+    Returns:
+        (mainshocks, aftershocks) -- mainshocks are unmodified event dicts;
+        aftershock dicts carry four extra attribution keys (parent_id,
+        parent_magnitude, delta_t_sec, delta_dist_km).
+    """
+    return _gk_decluster_with_parents_core(events, lambda _mag: (radius_km, window_days))
+
+
 def decluster_with_parents(
     events: list[dict],
     window_scale: float = 1.0,
@@ -246,68 +393,4 @@ def decluster_with_parents(
         (mainshocks, aftershocks) -- mainshocks are unmodified event dicts;
         aftershock dicts carry the four extra attribution keys.
     """
-    if not events:
-        return [], []
-
-    n = len(events)
-    times = [_parse_event_time(e["event_at"]) for e in events]
-    indices_by_mag = sorted(range(n), key=lambda i: events[i]["usgs_mag"], reverse=True)
-
-    is_dependent = [False] * n
-    parent_idx: list[int | None] = [None] * n
-    parent_dt_abs = [float("inf")] * n  # |delta_t_sec| for current best parent
-
-    for idx in indices_by_mag:
-        if is_dependent[idx]:
-            continue
-
-        mag = events[idx]["usgs_mag"]
-        lat = events[idx]["latitude"]
-        lon = events[idx]["longitude"]
-        t = times[idx]
-        dist_window, time_window = gk_window_scaled(mag, window_scale)
-        time_window_secs = time_window * 86400.0
-
-        for j in range(n):
-            if j == idx:
-                continue
-            if events[j]["usgs_mag"] > mag:
-                continue
-
-            dt_abs = abs((times[j] - t).total_seconds())
-            if dt_abs > time_window_secs:
-                continue
-
-            dist = haversine_km(lat, lon, events[j]["latitude"], events[j]["longitude"])
-            if dist > dist_window:
-                continue
-
-            if not is_dependent[j]:
-                is_dependent[j] = True
-                parent_idx[j] = idx
-                parent_dt_abs[j] = dt_abs
-            elif dt_abs < parent_dt_abs[j]:
-                # Re-assign to the temporally closer mainshock
-                parent_idx[j] = idx
-                parent_dt_abs[j] = dt_abs
-
-    mainshocks = [e for i, e in enumerate(events) if not is_dependent[i]]
-    aftershocks = []
-    for i, e in enumerate(events):
-        if not is_dependent[i]:
-            continue
-        p = parent_idx[i]
-        parent = events[p]
-        dt_sec = (times[i] - times[p]).total_seconds()
-        dist_km = haversine_km(
-            parent["latitude"], parent["longitude"],
-            e["latitude"], e["longitude"],
-        )
-        after_event = dict(e)
-        after_event["parent_id"] = parent["usgs_id"]
-        after_event["parent_magnitude"] = parent["usgs_mag"]
-        after_event["delta_t_sec"] = dt_sec
-        after_event["delta_dist_km"] = dist_km
-        aftershocks.append(after_event)
-
-    return mainshocks, aftershocks
+    return _gk_decluster_with_parents_core(events, lambda mag: gk_window_scaled(mag, window_scale))

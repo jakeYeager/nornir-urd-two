@@ -10,8 +10,10 @@ from datetime import date, datetime, timedelta, timezone
 from . import astro
 from .decluster import (
     decluster_a1b_fixed,
+    decluster_a1b_with_parents,
     decluster_gardner_knopoff,
     decluster_gardner_knopoff_table,
+    decluster_gardner_knopoff_with_parents,
     decluster_with_parents,
 )
 from .ocean import (
@@ -330,9 +332,75 @@ def _enrich(events: list[dict]) -> list[dict]:
     return enriched
 
 
-DECLUSTER_REQUIRED_COLUMNS = {"event_at", "latitude", "longitude", "usgs_mag"}
+DECLUSTER_REQUIRED_COLUMNS = {"usgs_id", "event_at", "latitude", "longitude", "usgs_mag"}
 
 AFTERSHOCK_EXTRA_COLUMNS = ["parent_id", "parent_magnitude", "delta_t_sec", "delta_dist_km"]
+MAINSHOCK_EXTRA_COLUMNS = ["foreshock_count", "aftershock_count", "window_secs", "window_km"]
+
+
+def _attach_mainshock_summaries(
+    mainshocks: list[dict],
+    aftershocks: list[dict],
+) -> list[dict]:
+    """Return mainshock dicts enriched with sequence summary columns.
+
+    For each mainshock the four new columns are derived from the aftershock rows
+    that claim it as parent:
+
+        foreshock_count  -- events where delta_t_sec < 0
+        aftershock_count -- events where delta_t_sec >= 0
+        window_secs      -- max |delta_t_sec| across all claimed events (0 if none)
+        window_km        -- max delta_dist_km across all claimed events (0 if none)
+
+    window_secs and window_km reflect the observed maximum reach across all claimed
+    events (foreshocks and aftershocks). For G-K-based algorithms this equals the
+    algorithm's theoretical window at the mainshock's magnitude. For Reasenberg,
+    where the interaction radius and lookback window vary dynamically, these columns
+    report the actual spatial and temporal reach observed in the data.
+    """
+    from collections import defaultdict
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for a in aftershocks:
+        groups[str(a["parent_id"])].append(a)
+
+    result = []
+    for ms in mainshocks:
+        group = groups[str(ms["usgs_id"])]
+        foreshock_count = sum(1 for a in group if float(a["delta_t_sec"]) < 0)
+        aftershock_count = sum(1 for a in group if float(a["delta_t_sec"]) >= 0)
+        window_secs = max((abs(float(a["delta_t_sec"])) for a in group), default=0)
+        window_km = max((float(a["delta_dist_km"]) for a in group), default=0)
+        ms_out = dict(ms)
+        ms_out["foreshock_count"] = foreshock_count
+        ms_out["aftershock_count"] = aftershock_count
+        ms_out["window_secs"] = window_secs
+        ms_out["window_km"] = window_km
+        result.append(ms_out)
+    return result
+
+
+def _write_decluster_outputs(
+    args: argparse.Namespace,
+    fieldnames: list[str],
+    mainshocks: list[dict],
+    aftershocks: list[dict],
+) -> None:
+    """Write mainshock and aftershock CSVs with sequence attribution columns."""
+    ms_fieldnames = fieldnames + MAINSHOCK_EXTRA_COLUMNS
+    as_fieldnames = fieldnames + AFTERSHOCK_EXTRA_COLUMNS
+    mainshocks_out = _attach_mainshock_summaries(mainshocks, aftershocks)
+
+    with open(args.mainshocks, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=ms_fieldnames)
+        writer.writeheader()
+        writer.writerows(mainshocks_out)
+    print(f"Wrote {len(mainshocks_out)} mainshocks to {args.mainshocks}")
+
+    with open(args.aftershocks, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=as_fieldnames)
+        writer.writeheader()
+        writer.writerows(aftershocks)
+    print(f"Wrote {len(aftershocks)} aftershocks to {args.aftershocks}")
 
 
 def _run_collect(args: argparse.Namespace) -> None:
@@ -364,8 +432,8 @@ def _run_collect(args: argparse.Namespace) -> None:
 
 def _run_decluster(args: argparse.Namespace) -> None:
     fieldnames, events = _load_decluster_csv(args.input)
-    mainshocks, aftershocks = decluster_gardner_knopoff(events)
-    _write_mainshocks_aftershocks(args, fieldnames, mainshocks, aftershocks)
+    mainshocks, aftershocks = decluster_gardner_knopoff_with_parents(events)
+    _write_decluster_outputs(args, fieldnames, mainshocks, aftershocks)
 
 
 def _load_decluster_csv(path: str) -> tuple[list[str], list[dict]]:
@@ -418,17 +486,17 @@ def _run_decluster_reasenberg(args: argparse.Namespace) -> None:
         p=args.p_value,
         xmeff=args.xmeff,
     )
-    _write_mainshocks_aftershocks(args, fieldnames, mainshocks, aftershocks)
+    _write_decluster_outputs(args, fieldnames, mainshocks, aftershocks)
 
 
 def _run_decluster_a1b(args: argparse.Namespace) -> None:
     fieldnames, events = _load_decluster_csv(args.input)
-    mainshocks, aftershocks = decluster_a1b_fixed(
+    mainshocks, aftershocks = decluster_a1b_with_parents(
         events,
         radius_km=args.radius,
         window_days=args.window,
     )
-    _write_mainshocks_aftershocks(args, fieldnames, mainshocks, aftershocks)
+    _write_decluster_outputs(args, fieldnames, mainshocks, aftershocks)
 
 
 def _run_parse_pb2002(args: argparse.Namespace) -> None:
@@ -559,20 +627,7 @@ def _run_window(args: argparse.Namespace) -> None:
         event["usgs_mag"] = float(event["usgs_mag"])
 
     mainshocks, aftershocks = decluster_with_parents(events, window_scale=args.window_size)
-
-    aftershock_fieldnames = fieldnames + AFTERSHOCK_EXTRA_COLUMNS
-
-    with open(args.mainshocks, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(mainshocks)
-    print(f"Wrote {len(mainshocks)} mainshocks to {args.mainshocks}")
-
-    with open(args.aftershocks, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=aftershock_fieldnames)
-        writer.writeheader()
-        writer.writerows(aftershocks)
-    print(f"Wrote {len(aftershocks)} aftershocks to {args.aftershocks}")
+    _write_decluster_outputs(args, fieldnames, mainshocks, aftershocks)
 
 
 def main(argv: list[str] | None = None) -> None:

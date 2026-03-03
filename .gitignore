@@ -10,6 +10,7 @@ data/output/*.*
 
 # Collected earthquake data (keep the directory, ignore any files inside)
 data/output/iscgem/*.*
+data/output/iscgem/sequence/*.*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

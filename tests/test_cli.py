@@ -155,7 +155,10 @@ class TestDeclusterCommand:
         ])
 
         header = mainfile.read_text().strip().split("\n")[0]
-        assert header == "usgs_id,usgs_mag,event_at,latitude,longitude,depth"
+        assert header == (
+            "usgs_id,usgs_mag,event_at,latitude,longitude,depth,"
+            "foreshock_count,aftershock_count,window_secs,window_km"
+        )
 
     def test_missing_columns_exits(self, tmp_path):
         infile = tmp_path / "bad.csv"

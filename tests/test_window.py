@@ -373,7 +373,7 @@ class TestWindowCLI:
         assert "delta_dist_km" in after_rows[0]
         assert after_rows[0]["parent_id"] == "main1"
 
-    def test_mainshock_output_has_no_extra_columns(self, tmp_path):
+    def test_mainshock_output_has_summary_columns(self, tmp_path):
         input_path = tmp_path / "events.csv"
         mainshocks_path = tmp_path / "main.csv"
         aftershocks_path = tmp_path / "after.csv"
@@ -405,4 +405,11 @@ class TestWindowCLI:
 
         with open(mainshocks_path, newline="") as f:
             reader = csv.DictReader(f)
-            assert reader.fieldnames == fieldnames
+            expected = fieldnames + [
+                "foreshock_count", "aftershock_count", "window_secs", "window_km"
+            ]
+            assert reader.fieldnames == expected
+            rows_out = list(reader)
+        assert len(rows_out) == 1
+        assert rows_out[0]["foreshock_count"] == "0"
+        assert rows_out[0]["aftershock_count"] == "1"
