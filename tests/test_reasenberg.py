@@ -43,6 +43,32 @@ class TestTau:
         tau = _tau(mmax=500.0, xmeff=1.5, p=0.95, tau_min=1.0, tau_max=10.0)
         assert tau == 1.0
 
+    def test_higher_xmeff_increases_tau(self):
+        """Raising xmeff reduces (mmax−xmeff), shrinking λ and extending τ."""
+        tau_low = _tau(mmax=6.0, xmeff=1.5, p=0.95, tau_min=1.0, tau_max=10.0)
+        tau_high = _tau(mmax=6.0, xmeff=6.0, p=0.95, tau_min=1.0, tau_max=10.0)
+        assert tau_high > tau_low
+
+    def test_catalog_floor_default_xmeff_collapses_tau(self):
+        """With a high-M catalog floor and default xmeff=1.5, τ always hits tau_min.
+
+        mmax=6.0, xmeff=1.5: λ = 10^4.5 ≈ 31623; raw τ ≈ 0.00009 days → tau_min.
+        This means xmeff=1.5 has no leverage on a catalog with M≥6 events; the
+        user must raise xmeff to the catalog floor for the parameter to matter.
+        """
+        tau = _tau(mmax=6.0, xmeff=1.5, p=0.95, tau_min=1.0, tau_max=10.0)
+        assert tau == 1.0
+
+    def test_xmeff_at_mmax_gives_adaptive_tau(self):
+        """When xmeff == mmax the exponent is 0, giving an intermediate τ.
+
+        λ = 10^0 = 1; raw τ = −ln(0.05) ≈ 2.996 days — well within [1, 10].
+        """
+        import math
+        tau = _tau(mmax=6.0, xmeff=6.0, p=0.95, tau_min=1.0, tau_max=10.0)
+        expected = -math.log(1.0 - 0.95)  # ≈ 2.996
+        assert abs(tau - expected) < 1e-9
+
 
 class TestDeclustersReasenberg:
     _MAINSHOCK = {
@@ -140,3 +166,40 @@ class TestDeclustersReasenberg:
         )
         assert len(main) == 2
         assert len(after) == 0
+
+    def test_xmeff_controls_temporal_clustering(self):
+        """xmeff determines whether a temporally distant event falls inside τ.
+
+        Two events 2 days apart at the same location, mainshock M=6.0:
+          - xmeff=1.5 (default): τ collapses to tau_min=1 day → 2 days > 1 day → no cluster
+          - xmeff=6.0:           τ ≈ 2.996 days          → 2 days < τ       → clustered
+        """
+        mainshock = {
+            "usgs_id": "ms",
+            "usgs_mag": 6.0,
+            "event_at": "2024-01-01T00:00:00Z",
+            "latitude": 35.0,
+            "longitude": 139.0,
+        }
+        two_days_later = {
+            "usgs_id": "later",
+            "usgs_mag": 4.0,
+            "event_at": "2024-01-03T00:00:00Z",  # exactly 2 days later, same spot
+            "latitude": 35.0,
+            "longitude": 139.0,
+        }
+
+        # Default xmeff=1.5: τ hits tau_min=1 day, 2-day event is outside window.
+        main_default, after_default = decluster_reasenberg(
+            [mainshock, two_days_later], tau_min=1.0, tau_max=10.0, xmeff=1.5
+        )
+        assert len(main_default) == 2, "xmeff=1.5 should produce no clustering for 2-day gap"
+        assert len(after_default) == 0
+
+        # Raised xmeff=6.0: τ ≈ 2.996 days, 2-day event falls inside window.
+        main_raised, after_raised = decluster_reasenberg(
+            [mainshock, two_days_later], tau_min=1.0, tau_max=10.0, xmeff=6.0
+        )
+        assert len(main_raised) == 1, "xmeff=6.0 should cluster the 2-day event"
+        assert len(after_raised) == 1
+        assert after_raised[0]["usgs_id"] == "later"

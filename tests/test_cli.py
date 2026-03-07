@@ -176,6 +176,63 @@ class TestDeclusterCommand:
 
 
 # ---------------------------------------------------------------------------
+# decluster-reasenberg CLI tests
+# ---------------------------------------------------------------------------
+
+# Two events 2 days apart at same location, mainshock M=6.0.
+# With default xmeff=1.5: τ collapses to tau_min=1 day → no clustering.
+# With xmeff=6.0:         τ ≈ 2.996 days → the second event is clustered.
+_REASENBERG_CSV = """\
+usgs_id,usgs_mag,event_at,latitude,longitude,depth
+ms,6.0,2024-01-01T00:00:00Z,35.0,139.0,10.0
+later,4.0,2024-01-03T00:00:00Z,35.0,139.0,10.0
+"""
+
+
+class TestDeclustersReasenbergCLI:
+    def _run(self, tmp_path, extra_args=None):
+        infile = tmp_path / "input.csv"
+        infile.write_text(_REASENBERG_CSV)
+        mainfile = tmp_path / "mainshocks.csv"
+        afterfile = tmp_path / "aftershocks.csv"
+        main([
+            "decluster-reasenberg",
+            "--input", str(infile),
+            "--mainshocks", str(mainfile),
+            "--aftershocks", str(afterfile),
+        ] + (extra_args or []))
+        return mainfile, afterfile
+
+    def test_default_xmeff_no_clustering(self, tmp_path):
+        """Default xmeff=1.5 collapses τ to 1 day; 2-day event is not clustered."""
+        mainfile, afterfile = self._run(tmp_path)
+        main_lines = mainfile.read_text().strip().split("\n")
+        after_lines = afterfile.read_text().strip().split("\n")
+        assert len(main_lines) == 3  # header + 2 mainshocks
+        assert len(after_lines) == 1  # header only
+
+    def test_raised_xmeff_enables_clustering(self, tmp_path):
+        """With xmeff=6.0, τ ≈ 2.996 days; the 2-day event is clustered."""
+        mainfile, afterfile = self._run(tmp_path, ["--xmeff", "6.0"])
+        main_lines = mainfile.read_text().strip().split("\n")
+        after_lines = afterfile.read_text().strip().split("\n")
+        assert len(main_lines) == 2  # header + 1 mainshock
+        assert len(after_lines) == 2  # header + 1 aftershock
+        assert "later" in after_lines[1]
+
+    def test_xmeff_default_matches_explicit_1_5(self, tmp_path):
+        """Passing --xmeff 1.5 explicitly should produce the same result as omitting it."""
+        import csv as _csv
+        mainfile_default, _ = self._run(tmp_path)
+        tmp2 = tmp_path / "explicit"
+        tmp2.mkdir()
+        mainfile_explicit, _ = self._run(tmp2, ["--xmeff", "1.5"])
+        rows_default = list(_csv.DictReader(mainfile_default.open()))
+        rows_explicit = list(_csv.DictReader(mainfile_explicit.open()))
+        assert [r["usgs_id"] for r in rows_default] == [r["usgs_id"] for r in rows_explicit]
+
+
+# ---------------------------------------------------------------------------
 # Shared fixture data for ocean-class tests
 # ---------------------------------------------------------------------------
 
