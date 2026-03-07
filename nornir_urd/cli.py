@@ -8,7 +8,24 @@ import sys
 from datetime import date, datetime, timedelta, timezone
 
 from . import astro
-from .decluster import decluster_gardner_knopoff, decluster_with_parents
+from .decluster import (
+    decluster_a1b_fixed,
+    decluster_a1b_with_parents,
+    decluster_gardner_knopoff,
+    decluster_gardner_knopoff_table,
+    decluster_gardner_knopoff_with_parents,
+    decluster_with_parents,
+)
+from .ocean import (
+    OUTPUT_FIELDNAMES as OCEAN_FIELDNAMES,
+    classify_events,
+    load_coastline_vertices,
+    load_pb2002_vertices,
+)
+from .pb2002 import parse_pb2002_steps, write_pb2002_types
+from .gcmt import APPEND_FIELDNAMES as GCMT_FIELDNAMES
+from .gcmt import MATCH_NULL, load_gcmt_dir, match_events
+from .reasenberg import decluster_reasenberg
 from .usgs import fetch_earthquakes
 
 OUTPUT_COLUMNS = [
@@ -77,6 +94,189 @@ def build_parser() -> argparse.ArgumentParser:
         help="Output CSV path for aftershock/foreshock events",
     )
 
+    # --- decluster-table ---------------------------------------------------
+    dtable = sub.add_parser(
+        "decluster-table",
+        help=(
+            "Decluster using the G-K (1974) discrete lookup table "
+            "(not the continuous formula used by 'decluster')"
+        ),
+    )
+    dtable.add_argument(
+        "--input", required=True,
+        help="Input CSV (must have event_at, latitude, longitude, usgs_mag)",
+    )
+    dtable.add_argument(
+        "--mainshocks", required=True,
+        help="Output CSV path for mainshock events",
+    )
+    dtable.add_argument(
+        "--aftershocks", required=True,
+        help="Output CSV path for aftershock/foreshock events",
+    )
+
+    # --- decluster-reasenberg ----------------------------------------------
+    dreason = sub.add_parser(
+        "decluster-reasenberg",
+        help="Decluster using the Reasenberg (1985) interaction-based algorithm",
+    )
+    dreason.add_argument(
+        "--input", required=True,
+        help="Input CSV (must have event_at, latitude, longitude, usgs_mag)",
+    )
+    dreason.add_argument(
+        "--mainshocks", required=True,
+        help="Output CSV path for mainshock events",
+    )
+    dreason.add_argument(
+        "--aftershocks", required=True,
+        help="Output CSV path for aftershock/foreshock events",
+    )
+    dreason.add_argument(
+        "--rfact", type=float, default=10.0,
+        help="Interaction radius scale factor (default: 10)",
+    )
+    dreason.add_argument(
+        "--tau-min", type=float, default=1.0,
+        help="Minimum cluster lookback window in days (default: 1.0)",
+    )
+    dreason.add_argument(
+        "--tau-max", type=float, default=10.0,
+        help="Maximum cluster lookback window in days (default: 10.0)",
+    )
+    dreason.add_argument(
+        "--p-value", type=float, default=0.95,
+        help="Omori decay probability threshold for cluster termination (default: 0.95)",
+    )
+    dreason.add_argument(
+        "--xmeff", type=float, default=1.5,
+        help="Effective magnitude threshold (default: 1.5)",
+    )
+
+    # --- decluster-a1b -----------------------------------------------------
+    da1b = sub.add_parser(
+        "decluster-a1b",
+        help="Decluster using fixed spatial and temporal windows (A1b-informed defaults)",
+    )
+    da1b.add_argument(
+        "--input", required=True,
+        help="Input CSV (must have event_at, latitude, longitude, usgs_mag)",
+    )
+    da1b.add_argument(
+        "--mainshocks", required=True,
+        help="Output CSV path for mainshock events",
+    )
+    da1b.add_argument(
+        "--aftershocks", required=True,
+        help="Output CSV path for aftershock/foreshock events",
+    )
+    da1b.add_argument(
+        "--radius", type=float, default=83.2,
+        help="Fixed spatial radius in km applied to all magnitudes (default: 83.2)",
+    )
+    da1b.add_argument(
+        "--window", type=float, default=95.6,
+        help="Fixed temporal window in days applied to all magnitudes (default: 95.6)",
+    )
+
+    # --- parse-pb2002 ------------------------------------------------------
+    ppb = sub.add_parser(
+        "parse-pb2002",
+        help="Parse pb2002_steps.dat into a boundary-segment type lookup CSV",
+    )
+    ppb.add_argument(
+        "--steps", default="lib/pb2002_steps.dat",
+        help="Path to pb2002_steps.dat (default: lib/pb2002_steps.dat)",
+    )
+    ppb.add_argument(
+        "--output", default="lib/pb2002_types.csv",
+        help="Output CSV path (default: lib/pb2002_types.csv)",
+    )
+
+    # --- ocean-class -------------------------------------------------------
+    oc = sub.add_parser(
+        "ocean-class",
+        help="Classify ISC-GEM events as oceanic, continental, or transitional",
+    )
+    oc.add_argument(
+        "--input", required=True,
+        help="Input CSV; must have usgs_id, latitude, longitude",
+    )
+    oc.add_argument(
+        "--output", required=True,
+        help="Output CSV (usgs_id, ocean_class, dist_to_coast_km)",
+    )
+    oc.add_argument(
+        "--method", default="ne", choices=["ne", "gshhg", "pb2002"],
+        help=(
+            "Coastline data source: 'ne' (Natural Earth vertex CSV, default), "
+            "'gshhg' (GSHHG vertex CSV), 'pb2002' (PB2002 boundary proxy)"
+        ),
+    )
+    oc.add_argument(
+        "--coastline", default="lib/ne_coastline_vertices.csv",
+        help="Path to coastline vertex CSV for ne/gshhg methods "
+             "(default: lib/ne_coastline_vertices.csv)",
+    )
+    oc.add_argument(
+        "--pb2002-types", default="lib/pb2002_types.csv",
+        help="Path to pb2002_types.csv for pb2002 method "
+             "(default: lib/pb2002_types.csv)",
+    )
+    oc.add_argument(
+        "--oceanic-km", type=float, default=200.0,
+        help="Distance threshold (km): events beyond this are oceanic (default: 200)",
+    )
+    oc.add_argument(
+        "--coastal-km", type=float, default=50.0,
+        help="Distance threshold (km): events within this are continental (default: 50)",
+    )
+
+    # --- focal-join --------------------------------------------------------
+    fj = sub.add_parser(
+        "focal-join",
+        help="Join GCMT focal mechanism data to ISC-GEM catalog",
+    )
+    fj.add_argument(
+        "--input", required=True,
+        help="Input CSV; must have usgs_id, event_at, latitude, longitude, usgs_mag",
+    )
+    fj.add_argument(
+        "--output", required=True,
+        help="Output CSV (all input columns retained; GCMT columns appended)",
+    )
+    fj.add_argument(
+        "--gcmt-dir", default="lib/gcmt/",
+        help="Directory containing GCMT .ndk files (default: lib/gcmt/)",
+    )
+    fj.add_argument(
+        "--time-tol", type=float, default=60.0,
+        help="Time match tolerance in seconds (default: 60)",
+    )
+    fj.add_argument(
+        "--dist-km", type=float, default=50.0,
+        help="Distance match tolerance in km (default: 50)",
+    )
+    fj.add_argument(
+        "--mag-tol", type=float, default=0.3,
+        help="Magnitude match tolerance (default: 0.3)",
+    )
+
+    # --- solar-geometry ----------------------------------------------------
+    sg = sub.add_parser(
+        "solar-geometry",
+        help="Append solar declination, declination rate, and Earth-Sun distance to a catalog",
+    )
+    sg.add_argument(
+        "--input", required=True,
+        help="Input CSV; must have usgs_id and event_at",
+    )
+    sg.add_argument(
+        "--output", required=True,
+        help="Output CSV (all input columns retained; solar geometry columns appended)",
+    )
+
+    # --- window ------------------------------------------------------------
     window_p = sub.add_parser(
         "window",
         help="Decluster with a scaled G-K window; aftershock output includes parent attribution",
@@ -132,9 +332,75 @@ def _enrich(events: list[dict]) -> list[dict]:
     return enriched
 
 
-DECLUSTER_REQUIRED_COLUMNS = {"event_at", "latitude", "longitude", "usgs_mag"}
+DECLUSTER_REQUIRED_COLUMNS = {"usgs_id", "event_at", "latitude", "longitude", "usgs_mag"}
 
 AFTERSHOCK_EXTRA_COLUMNS = ["parent_id", "parent_magnitude", "delta_t_sec", "delta_dist_km"]
+MAINSHOCK_EXTRA_COLUMNS = ["foreshock_count", "aftershock_count", "window_secs", "window_km"]
+
+
+def _attach_mainshock_summaries(
+    mainshocks: list[dict],
+    aftershocks: list[dict],
+) -> list[dict]:
+    """Return mainshock dicts enriched with sequence summary columns.
+
+    For each mainshock the four new columns are derived from the aftershock rows
+    that claim it as parent:
+
+        foreshock_count  -- events where delta_t_sec < 0
+        aftershock_count -- events where delta_t_sec >= 0
+        window_secs      -- max |delta_t_sec| across all claimed events (0 if none)
+        window_km        -- max delta_dist_km across all claimed events (0 if none)
+
+    window_secs and window_km reflect the observed maximum reach across all claimed
+    events (foreshocks and aftershocks). For G-K-based algorithms this equals the
+    algorithm's theoretical window at the mainshock's magnitude. For Reasenberg,
+    where the interaction radius and lookback window vary dynamically, these columns
+    report the actual spatial and temporal reach observed in the data.
+    """
+    from collections import defaultdict
+    groups: dict[str, list[dict]] = defaultdict(list)
+    for a in aftershocks:
+        groups[str(a["parent_id"])].append(a)
+
+    result = []
+    for ms in mainshocks:
+        group = groups[str(ms["usgs_id"])]
+        foreshock_count = sum(1 for a in group if float(a["delta_t_sec"]) < 0)
+        aftershock_count = sum(1 for a in group if float(a["delta_t_sec"]) >= 0)
+        window_secs = max((abs(float(a["delta_t_sec"])) for a in group), default=0)
+        window_km = max((float(a["delta_dist_km"]) for a in group), default=0)
+        ms_out = dict(ms)
+        ms_out["foreshock_count"] = foreshock_count
+        ms_out["aftershock_count"] = aftershock_count
+        ms_out["window_secs"] = window_secs
+        ms_out["window_km"] = window_km
+        result.append(ms_out)
+    return result
+
+
+def _write_decluster_outputs(
+    args: argparse.Namespace,
+    fieldnames: list[str],
+    mainshocks: list[dict],
+    aftershocks: list[dict],
+) -> None:
+    """Write mainshock and aftershock CSVs with sequence attribution columns."""
+    ms_fieldnames = fieldnames + MAINSHOCK_EXTRA_COLUMNS
+    as_fieldnames = fieldnames + AFTERSHOCK_EXTRA_COLUMNS
+    mainshocks_out = _attach_mainshock_summaries(mainshocks, aftershocks)
+
+    with open(args.mainshocks, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=ms_fieldnames)
+        writer.writeheader()
+        writer.writerows(mainshocks_out)
+    print(f"Wrote {len(mainshocks_out)} mainshocks to {args.mainshocks}")
+
+    with open(args.aftershocks, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=as_fieldnames)
+        writer.writeheader()
+        writer.writerows(aftershocks)
+    print(f"Wrote {len(aftershocks)} aftershocks to {args.aftershocks}")
 
 
 def _run_collect(args: argparse.Namespace) -> None:
@@ -165,7 +431,14 @@ def _run_collect(args: argparse.Namespace) -> None:
 
 
 def _run_decluster(args: argparse.Namespace) -> None:
-    with open(args.input, newline="") as f:
+    fieldnames, events = _load_decluster_csv(args.input)
+    mainshocks, aftershocks = decluster_gardner_knopoff_with_parents(events)
+    _write_decluster_outputs(args, fieldnames, mainshocks, aftershocks)
+
+
+def _load_decluster_csv(path: str) -> tuple[list[str], list[dict]]:
+    """Read a decluster-compatible CSV; cast numeric columns; return (fieldnames, events)."""
+    with open(path, newline="") as f:
         reader = csv.DictReader(f)
         fieldnames = list(reader.fieldnames or [])
         missing = DECLUSTER_REQUIRED_COLUMNS - set(fieldnames)
@@ -173,15 +446,19 @@ def _run_decluster(args: argparse.Namespace) -> None:
             print(f"Error: input CSV missing required columns: {', '.join(sorted(missing))}")
             sys.exit(1)
         events = list(reader)
-
-    # csv.DictReader returns strings; cast numeric fields
     for event in events:
         event["latitude"] = float(event["latitude"])
         event["longitude"] = float(event["longitude"])
         event["usgs_mag"] = float(event["usgs_mag"])
+    return fieldnames, events
 
-    mainshocks, aftershocks = decluster_gardner_knopoff(events)
 
+def _write_mainshocks_aftershocks(
+    args: argparse.Namespace,
+    fieldnames: list[str],
+    mainshocks: list[dict],
+    aftershocks: list[dict],
+) -> None:
     for path, rows, label in [
         (args.mainshocks, mainshocks, "mainshocks"),
         (args.aftershocks, aftershocks, "aftershocks"),
@@ -191,6 +468,153 @@ def _run_decluster(args: argparse.Namespace) -> None:
             writer.writeheader()
             writer.writerows(rows)
         print(f"Wrote {len(rows)} {label} to {path}")
+
+
+def _run_decluster_table(args: argparse.Namespace) -> None:
+    fieldnames, events = _load_decluster_csv(args.input)
+    mainshocks, aftershocks = decluster_gardner_knopoff_table(events)
+    _write_mainshocks_aftershocks(args, fieldnames, mainshocks, aftershocks)
+
+
+def _run_decluster_reasenberg(args: argparse.Namespace) -> None:
+    fieldnames, events = _load_decluster_csv(args.input)
+    p = args.p_value
+    if not (0.0 < p < 1.0):
+        raise SystemExit(
+            f"--p-value must be in (0, 1), got {p}. "
+            "Did you mean to pass a fraction (e.g. 0.90 instead of 90)?"
+        )
+    mainshocks, aftershocks = decluster_reasenberg(
+        events,
+        rfact=args.rfact,
+        tau_min=args.tau_min,
+        tau_max=args.tau_max,
+        p=p,
+        xmeff=args.xmeff,
+    )
+    _write_decluster_outputs(args, fieldnames, mainshocks, aftershocks)
+
+
+def _run_decluster_a1b(args: argparse.Namespace) -> None:
+    fieldnames, events = _load_decluster_csv(args.input)
+    mainshocks, aftershocks = decluster_a1b_with_parents(
+        events,
+        radius_km=args.radius,
+        window_days=args.window,
+    )
+    _write_decluster_outputs(args, fieldnames, mainshocks, aftershocks)
+
+
+def _run_parse_pb2002(args: argparse.Namespace) -> None:
+    rows = parse_pb2002_steps(args.steps)
+    write_pb2002_types(rows, args.output)
+    print(f"Wrote {len(rows)} boundary segments to {args.output}")
+
+
+def _run_ocean_class(args: argparse.Namespace) -> None:
+    with open(args.input, newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        missing = {"usgs_id", "latitude", "longitude"} - set(fieldnames)
+        if missing:
+            print(f"Error: input CSV missing required columns: {', '.join(sorted(missing))}")
+            sys.exit(1)
+        events = list(reader)
+
+    if args.method == "pb2002":
+        vertices = load_pb2002_vertices(args.pb2002_types)
+    else:
+        vertices = load_coastline_vertices(args.coastline)
+
+    total = len(events)
+    print(f"Classifying {total} events against {len(vertices)} coastline vertices ...",
+          file=sys.stderr)
+
+    _last_pct: list[int] = [-1]
+
+    def _progress(current: int, total: int) -> None:
+        pct = (100 * current) // total if total > 0 else 100
+        if pct != _last_pct[0]:
+            _last_pct[0] = pct
+            print(f"\r  {current}/{total} ({pct}%)", end="", flush=True, file=sys.stderr)
+        if current == total:
+            print(file=sys.stderr)
+
+    results = classify_events(
+        events,
+        vertices,
+        oceanic_km=args.oceanic_km,
+        coastal_km=args.coastal_km,
+        progress=_progress,
+    )
+
+    with open(args.output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=OCEAN_FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(results)
+    print(f"Wrote {len(results)} classified events to {args.output}")
+
+
+_SOLAR_GEOMETRY_COLUMNS = ["solar_declination", "declination_rate", "earth_sun_distance"]
+
+
+def _run_solar_geometry(args: argparse.Namespace) -> None:
+    with open(args.input, newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        missing = {"usgs_id", "event_at"} - set(fieldnames)
+        if missing:
+            print(f"Error: input CSV missing required columns: {', '.join(sorted(missing))}")
+            sys.exit(1)
+        events = list(reader)
+
+    out_fieldnames = fieldnames + _SOLAR_GEOMETRY_COLUMNS
+    with open(args.output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=out_fieldnames)
+        writer.writeheader()
+        for ev in events:
+            event_at = datetime.fromisoformat(ev["event_at"].replace("Z", "+00:00"))
+            dec, rate, dist = astro.solar_geometry(event_at)
+            row = dict(ev)
+            row["solar_declination"] = round(dec, 6)
+            row["declination_rate"] = round(rate, 6)
+            row["earth_sun_distance"] = round(dist, 6)
+            writer.writerow(row)
+
+    print(f"Wrote {len(events)} events to {args.output}")
+
+
+def _run_focal_join(args: argparse.Namespace) -> None:
+    with open(args.input, newline="") as f:
+        reader = csv.DictReader(f)
+        fieldnames = list(reader.fieldnames or [])
+        required = {"usgs_id", "event_at", "latitude", "longitude", "usgs_mag"}
+        missing = required - set(fieldnames)
+        if missing:
+            print(f"Error: input CSV missing required columns: {', '.join(sorted(missing))}")
+            sys.exit(1)
+        events = list(reader)
+
+    gcmt_records = load_gcmt_dir(args.gcmt_dir)
+    if not gcmt_records:
+        print(f"Warning: no .ndk files found in {args.gcmt_dir}")
+
+    results = match_events(
+        events,
+        gcmt_records,
+        time_tol_s=args.time_tol,
+        dist_km=args.dist_km,
+        mag_tol=args.mag_tol,
+    )
+
+    out_fieldnames = fieldnames + GCMT_FIELDNAMES
+    with open(args.output, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=out_fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(results)
+
+    matched = sum(1 for r in results if r.get("match_confidence") != MATCH_NULL)
+    print(f"Wrote {len(results)} events ({matched} matched) to {args.output}")
 
 
 def _run_window(args: argparse.Namespace) -> None:
@@ -209,20 +633,7 @@ def _run_window(args: argparse.Namespace) -> None:
         event["usgs_mag"] = float(event["usgs_mag"])
 
     mainshocks, aftershocks = decluster_with_parents(events, window_scale=args.window_size)
-
-    aftershock_fieldnames = fieldnames + AFTERSHOCK_EXTRA_COLUMNS
-
-    with open(args.mainshocks, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(mainshocks)
-    print(f"Wrote {len(mainshocks)} mainshocks to {args.mainshocks}")
-
-    with open(args.aftershocks, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=aftershock_fieldnames)
-        writer.writeheader()
-        writer.writerows(aftershocks)
-    print(f"Wrote {len(aftershocks)} aftershocks to {args.aftershocks}")
+    _write_decluster_outputs(args, fieldnames, mainshocks, aftershocks)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -233,6 +644,20 @@ def main(argv: list[str] | None = None) -> None:
         _run_collect(args)
     elif args.command == "decluster":
         _run_decluster(args)
+    elif args.command == "decluster-table":
+        _run_decluster_table(args)
+    elif args.command == "decluster-reasenberg":
+        _run_decluster_reasenberg(args)
+    elif args.command == "decluster-a1b":
+        _run_decluster_a1b(args)
+    elif args.command == "parse-pb2002":
+        _run_parse_pb2002(args)
+    elif args.command == "ocean-class":
+        _run_ocean_class(args)
+    elif args.command == "focal-join":
+        _run_focal_join(args)
+    elif args.command == "solar-geometry":
+        _run_solar_geometry(args)
     elif args.command == "window":
         _run_window(args)
     else:

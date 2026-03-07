@@ -155,7 +155,10 @@ class TestDeclusterCommand:
         ])
 
         header = mainfile.read_text().strip().split("\n")[0]
-        assert header == "usgs_id,usgs_mag,event_at,latitude,longitude,depth"
+        assert header == (
+            "usgs_id,usgs_mag,event_at,latitude,longitude,depth,"
+            "foreshock_count,aftershock_count,window_secs,window_km"
+        )
 
     def test_missing_columns_exits(self, tmp_path):
         infile = tmp_path / "bad.csv"
@@ -170,3 +173,225 @@ class TestDeclusterCommand:
                 "--mainshocks", str(mainfile),
                 "--aftershocks", str(afterfile),
             ])
+
+
+# ---------------------------------------------------------------------------
+# decluster-reasenberg CLI tests
+# ---------------------------------------------------------------------------
+
+# Two events 2 days apart at same location, mainshock M=6.0.
+# With default xmeff=1.5: τ collapses to tau_min=1 day → no clustering.
+# With xmeff=6.0:         τ ≈ 2.996 days → the second event is clustered.
+_REASENBERG_CSV = """\
+usgs_id,usgs_mag,event_at,latitude,longitude,depth
+ms,6.0,2024-01-01T00:00:00Z,35.0,139.0,10.0
+later,4.0,2024-01-03T00:00:00Z,35.0,139.0,10.0
+"""
+
+
+class TestDeclustersReasenbergCLI:
+    def _run(self, tmp_path, extra_args=None):
+        infile = tmp_path / "input.csv"
+        infile.write_text(_REASENBERG_CSV)
+        mainfile = tmp_path / "mainshocks.csv"
+        afterfile = tmp_path / "aftershocks.csv"
+        main([
+            "decluster-reasenberg",
+            "--input", str(infile),
+            "--mainshocks", str(mainfile),
+            "--aftershocks", str(afterfile),
+        ] + (extra_args or []))
+        return mainfile, afterfile
+
+    def test_default_xmeff_no_clustering(self, tmp_path):
+        """Default xmeff=1.5 collapses τ to 1 day; 2-day event is not clustered."""
+        mainfile, afterfile = self._run(tmp_path)
+        main_lines = mainfile.read_text().strip().split("\n")
+        after_lines = afterfile.read_text().strip().split("\n")
+        assert len(main_lines) == 3  # header + 2 mainshocks
+        assert len(after_lines) == 1  # header only
+
+    def test_raised_xmeff_enables_clustering(self, tmp_path):
+        """With xmeff=6.0, τ ≈ 2.996 days; the 2-day event is clustered."""
+        mainfile, afterfile = self._run(tmp_path, ["--xmeff", "6.0"])
+        main_lines = mainfile.read_text().strip().split("\n")
+        after_lines = afterfile.read_text().strip().split("\n")
+        assert len(main_lines) == 2  # header + 1 mainshock
+        assert len(after_lines) == 2  # header + 1 aftershock
+        assert "later" in after_lines[1]
+
+    def test_xmeff_default_matches_explicit_1_5(self, tmp_path):
+        """Passing --xmeff 1.5 explicitly should produce the same result as omitting it."""
+        import csv as _csv
+        mainfile_default, _ = self._run(tmp_path)
+        tmp2 = tmp_path / "explicit"
+        tmp2.mkdir()
+        mainfile_explicit, _ = self._run(tmp2, ["--xmeff", "1.5"])
+        rows_default = list(_csv.DictReader(mainfile_default.open()))
+        rows_explicit = list(_csv.DictReader(mainfile_explicit.open()))
+        assert [r["usgs_id"] for r in rows_default] == [r["usgs_id"] for r in rows_explicit]
+
+
+# ---------------------------------------------------------------------------
+# Shared fixture data for ocean-class tests
+# ---------------------------------------------------------------------------
+
+_OCEAN_CLASS_INPUT = """\
+usgs_id,usgs_mag,event_at,latitude,longitude,depth
+eq1,6.0,2020-01-01T00:00:00Z,0.0,0.0,10.0
+eq2,6.5,2020-06-01T12:00:00Z,45.0,10.0,20.0
+"""
+
+# Minimal coastline CSV: two vertices at (lon=0,lat=0) and (lon=10,lat=45)
+_NE_COASTLINE_CSV = "lon,lat\n0.0,0.0\n10.0,45.0\n"
+
+# Minimal pb2002_types CSV matching the expected DictReader schema
+_PB2002_TYPES_CSV = (
+    "segment_id,plate_a,plate_b,boundary_type_code,boundary_type_label,lon,lat\n"
+    "1,PA,NA,CTF,Continental transform fault,0.0,0.0\n"
+    "2,PA,NA,CTF,Continental transform fault,10.0,45.0\n"
+)
+
+
+class TestOceanClassCommand:
+    """CLI integration tests for the ocean-class subcommand."""
+
+    def _run(self, tmp_path, extra_args):
+        infile = tmp_path / "input.csv"
+        infile.write_text(_OCEAN_CLASS_INPUT)
+        outfile = tmp_path / "output.csv"
+        main(["ocean-class", "--input", str(infile), "--output", str(outfile)] + extra_args)
+        return outfile
+
+    # --- method: ne (default) -----------------------------------------------
+
+    def test_ne_writes_output_file(self, tmp_path):
+        coastfile = tmp_path / "coast.csv"
+        coastfile.write_text(_NE_COASTLINE_CSV)
+        outfile = self._run(tmp_path, ["--method", "ne", "--coastline", str(coastfile)])
+        assert outfile.exists()
+
+    def test_ne_output_header(self, tmp_path):
+        coastfile = tmp_path / "coast.csv"
+        coastfile.write_text(_NE_COASTLINE_CSV)
+        outfile = self._run(tmp_path, ["--method", "ne", "--coastline", str(coastfile)])
+        header = outfile.read_text().strip().split("\n")[0]
+        assert header == "usgs_id,ocean_class,dist_to_coast_km"
+
+    def test_ne_row_count_matches_input(self, tmp_path):
+        coastfile = tmp_path / "coast.csv"
+        coastfile.write_text(_NE_COASTLINE_CSV)
+        outfile = self._run(tmp_path, ["--method", "ne", "--coastline", str(coastfile)])
+        lines = outfile.read_text().strip().split("\n")
+        assert len(lines) == 3  # header + 2 data rows
+
+    def test_ne_usgs_ids_preserved(self, tmp_path):
+        coastfile = tmp_path / "coast.csv"
+        coastfile.write_text(_NE_COASTLINE_CSV)
+        outfile = self._run(tmp_path, ["--method", "ne", "--coastline", str(coastfile)])
+        import csv as _csv
+        rows = list(_csv.DictReader(outfile.open()))
+        assert [r["usgs_id"] for r in rows] == ["eq1", "eq2"]
+
+    def test_ne_ocean_class_values_are_valid(self, tmp_path):
+        coastfile = tmp_path / "coast.csv"
+        coastfile.write_text(_NE_COASTLINE_CSV)
+        outfile = self._run(tmp_path, ["--method", "ne", "--coastline", str(coastfile)])
+        import csv as _csv
+        rows = list(_csv.DictReader(outfile.open()))
+        valid = {"oceanic", "continental", "transitional"}
+        assert all(r["ocean_class"] in valid for r in rows)
+
+    def test_ne_eq1_at_coast_vertex_is_continental(self, tmp_path):
+        # eq1 is at (lat=0, lon=0) which exactly matches the first vertex — dist ≈ 0
+        coastfile = tmp_path / "coast.csv"
+        coastfile.write_text(_NE_COASTLINE_CSV)
+        outfile = self._run(tmp_path, ["--method", "ne", "--coastline", str(coastfile)])
+        import csv as _csv
+        rows = {r["usgs_id"]: r for r in _csv.DictReader(outfile.open())}
+        assert rows["eq1"]["ocean_class"] == "continental"
+
+    # --- method: gshhg -------------------------------------------------------
+
+    def test_gshhg_writes_output_file(self, tmp_path):
+        coastfile = tmp_path / "gshhg.csv"
+        coastfile.write_text(_NE_COASTLINE_CSV)
+        outfile = self._run(tmp_path, ["--method", "gshhg", "--coastline", str(coastfile)])
+        assert outfile.exists()
+
+    def test_gshhg_row_count_matches_input(self, tmp_path):
+        coastfile = tmp_path / "gshhg.csv"
+        coastfile.write_text(_NE_COASTLINE_CSV)
+        outfile = self._run(tmp_path, ["--method", "gshhg", "--coastline", str(coastfile)])
+        lines = outfile.read_text().strip().split("\n")
+        assert len(lines) == 3
+
+    def test_gshhg_output_header(self, tmp_path):
+        coastfile = tmp_path / "gshhg.csv"
+        coastfile.write_text(_NE_COASTLINE_CSV)
+        outfile = self._run(tmp_path, ["--method", "gshhg", "--coastline", str(coastfile)])
+        header = outfile.read_text().strip().split("\n")[0]
+        assert header == "usgs_id,ocean_class,dist_to_coast_km"
+
+    def test_gshhg_same_result_as_ne_for_identical_vertices(self, tmp_path):
+        # gshhg and ne use the same code path; identical input → identical output
+        coastfile = tmp_path / "coast.csv"
+        coastfile.write_text(_NE_COASTLINE_CSV)
+        ne_out = tmp_path / "ne_out.csv"
+        gshhg_out = tmp_path / "gshhg_out.csv"
+        infile = tmp_path / "input.csv"
+        infile.write_text(_OCEAN_CLASS_INPUT)
+        main(["ocean-class", "--input", str(infile), "--output", str(ne_out),
+              "--method", "ne", "--coastline", str(coastfile)])
+        main(["ocean-class", "--input", str(infile), "--output", str(gshhg_out),
+              "--method", "gshhg", "--coastline", str(coastfile)])
+        assert ne_out.read_text() == gshhg_out.read_text()
+
+    # --- method: pb2002 ------------------------------------------------------
+
+    def test_pb2002_writes_output_file(self, tmp_path):
+        typesfile = tmp_path / "types.csv"
+        typesfile.write_text(_PB2002_TYPES_CSV)
+        outfile = self._run(tmp_path, ["--method", "pb2002", "--pb2002-types", str(typesfile)])
+        assert outfile.exists()
+
+    def test_pb2002_row_count_matches_input(self, tmp_path):
+        typesfile = tmp_path / "types.csv"
+        typesfile.write_text(_PB2002_TYPES_CSV)
+        outfile = self._run(tmp_path, ["--method", "pb2002", "--pb2002-types", str(typesfile)])
+        lines = outfile.read_text().strip().split("\n")
+        assert len(lines) == 3
+
+    def test_pb2002_output_header(self, tmp_path):
+        typesfile = tmp_path / "types.csv"
+        typesfile.write_text(_PB2002_TYPES_CSV)
+        outfile = self._run(tmp_path, ["--method", "pb2002", "--pb2002-types", str(typesfile)])
+        header = outfile.read_text().strip().split("\n")[0]
+        assert header == "usgs_id,ocean_class,dist_to_coast_km"
+
+    def test_pb2002_usgs_ids_preserved(self, tmp_path):
+        typesfile = tmp_path / "types.csv"
+        typesfile.write_text(_PB2002_TYPES_CSV)
+        outfile = self._run(tmp_path, ["--method", "pb2002", "--pb2002-types", str(typesfile)])
+        import csv as _csv
+        rows = list(_csv.DictReader(outfile.open()))
+        assert [r["usgs_id"] for r in rows] == ["eq1", "eq2"]
+
+    def test_pb2002_ocean_class_values_are_valid(self, tmp_path):
+        typesfile = tmp_path / "types.csv"
+        typesfile.write_text(_PB2002_TYPES_CSV)
+        outfile = self._run(tmp_path, ["--method", "pb2002", "--pb2002-types", str(typesfile)])
+        import csv as _csv
+        rows = list(_csv.DictReader(outfile.open()))
+        valid = {"oceanic", "continental", "transitional"}
+        assert all(r["ocean_class"] in valid for r in rows)
+
+    # --- missing required columns -------------------------------------------
+
+    def test_missing_columns_exits(self, tmp_path):
+        infile = tmp_path / "bad.csv"
+        infile.write_text("usgs_id,usgs_mag\neq1,6.0\n")
+        outfile = tmp_path / "out.csv"
+        with pytest.raises(SystemExit):
+            main(["ocean-class", "--input", str(infile), "--output", str(outfile),
+                  "--coastline", str(tmp_path / "coast.csv")])

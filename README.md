@@ -26,12 +26,12 @@ uv sync
 
 ### Ephemeris data
 
-The astronomical calculations depend on the JPL DE421 ephemeris (`de421.bsp`, ~17 MB). Skyfield downloads this file automatically on first run into the working directory. It is excluded from version control via `.gitignore`.
+The astronomical calculations depend on the JPL DE421 ephemeris (`de421.bsp`, ~17 MB). Skyfield downloads this file automatically on first run into `lib/`. It is excluded from version control via `.gitignore`.
 
 To download it manually:
 
 ```bash
-uv run python -c "from skyfield.api import load; load('de421.bsp')"
+mkdir -p lib && uv run python -c "from skyfield.api import Loader; Loader('lib')('de421.bsp')"
 ```
 
 ## Usage
@@ -99,10 +99,11 @@ uv run python -m nornir_urd decluster \
 
 #### Declustering existing CSVs
 
-The `decluster` command works on any CSV file, not just output from the `collect` command. The input CSV must contain these columns:
+All declustering commands work on any CSV file, not just output from the `collect` command. The input CSV must contain these columns:
 
 | Required column | Description                                      |
 | --------------- | ------------------------------------------------ |
+| `usgs_id`       | Unique event identifier (string)                 |
 | `event_at`      | ISO 8601 timestamp (e.g. `2026-01-15T12:00:00Z`) |
 | `latitude`      | Event latitude (float)                           |
 | `longitude`     | Event longitude (float)                          |
@@ -121,6 +122,32 @@ The implementation uses the Gardner-Knopoff (1974) empirical formulas for magnit
 Distances are computed using the Haversine formula (spherical Earth, radius 6371 km). This introduces a minor approximation versus the WGS84 ellipsoid -- maximum error is ~0.3% (~0.5 km at the equator for a 150 km distance). At the spatial scales of the G-K windows (tens to hundreds of km), this is negligible relative to the uncertainty in the window parameters themselves.
 
 The algorithm has O(n^2) time complexity (pairwise event comparison). This is efficient for catalogs up to ~50,000 events. For M6.0+ global catalogs (~100-200 events/year), runtime is effectively instant.
+
+#### Aftershock output columns
+
+The aftershock CSV retains all input columns plus four attribution columns appended at the end:
+
+| Column             | Description                                                                    |
+| ------------------ | ------------------------------------------------------------------------------ |
+| `parent_id`        | `usgs_id` of the mainshock whose window claimed this event                     |
+| `parent_magnitude` | Magnitude of the parent mainshock                                              |
+| `delta_t_sec`      | Signed elapsed seconds from the parent to this event (negative for foreshocks) |
+| `delta_dist_km`    | Great-circle distance in km between this event and its parent                  |
+
+When two mainshock windows overlap and both could claim the same event, the parent is the mainshock with the smallest `|delta_t_sec|` (temporal proximity takes priority over spatial proximity).
+
+#### Mainshock output columns
+
+The mainshock CSV retains all input columns plus four summary columns appended at the end:
+
+| Column             | Description                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| `foreshock_count`  | Number of claimed events with `delta_t_sec < 0` (occurred before the mainshock)         |
+| `aftershock_count` | Number of claimed events with `delta_t_sec >= 0` (occurred at or after the mainshock)   |
+| `window_secs`      | Maximum `\|delta_t_sec\|` observed across all claimed events (seconds)                  |
+| `window_km`        | Maximum `delta_dist_km` observed across all claimed events (km)                         |
+
+`window_secs` and `window_km` reflect the observed maximum temporal and spatial reach across all events claimed by that mainshock. For the G-K formula this equals the algorithm's theoretical window at the mainshock's magnitude. Mainshocks with no claimed events have `window_secs = 0` and `window_km = 0`.
 
 ### Window
 
@@ -156,7 +183,159 @@ The aftershock CSV contains all columns from the input plus four attribution col
 
 When two mainshock windows overlap and both could claim the same event, the parent is the mainshock with the smallest `|delta_t_sec|` (temporal proximity takes priority over spatial proximity).
 
-The mainshock output is identical in format to `decluster` — original columns only, no attribution metadata.
+The mainshock CSV retains all input columns plus the same four summary columns described in the `decluster` section above (`foreshock_count`, `aftershock_count`, `window_secs`, `window_km`).
+
+### Decluster variants
+
+Two additional declustering subcommands are available:
+
+**`decluster-table`** — Uses the discrete G-K (1974) lookup table instead of the continuous empirical formula. Accepts the same arguments as `decluster`.
+
+```bash
+uv run python -m nornir_urd decluster-table \
+  --input data/output/global_events.csv \
+  --mainshocks data/output/mainshocks_table.csv \
+  --aftershocks data/output/aftershocks_table.csv
+```
+
+**`decluster-reasenberg`** — Reasenberg (1985) interaction-based clustering algorithm.
+
+```bash
+uv run python -m nornir_urd decluster-reasenberg \
+  --input data/output/global_events.csv \
+  --mainshocks data/output/mainshocks_reas.csv \
+  --aftershocks data/output/aftershocks_reas.csv
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--rfact FLOAT` | `10` | Interaction radius scale factor |
+| `--tau-min FLOAT` | `1.0` | Minimum cluster lookback window (days) |
+| `--tau-max FLOAT` | `10.0` | Maximum cluster lookback window (days) |
+| `--p-value FLOAT` | `0.95` | Omori decay probability threshold |
+| `--xmeff FLOAT` | `1.5` | Effective magnitude threshold |
+
+Both the aftershock CSV and mainshock CSV include the same attribution and summary columns described in the `decluster` section above. For Reasenberg, each aftershock's parent is the highest-magnitude event in its cluster; no tie-breaking is required since each event belongs to exactly one cluster. `window_secs` and `window_km` on each mainshock row report the actual maximum temporal and spatial reach observed across its claimed events — Reasenberg's interaction radius and adaptive lookback window vary dynamically, so these observed maximums provide the most meaningful per-mainshock footprint.
+
+**`decluster-a1b`** — Fixed spatial-temporal window declustering using A1b-informed defaults (83.2 km radius, 95.6-day window, applied uniformly to all magnitudes).
+
+```bash
+uv run python -m nornir_urd decluster-a1b \
+  --input data/output/global_events.csv \
+  --mainshocks data/output/mainshocks_a1b.csv \
+  --aftershocks data/output/aftershocks_a1b.csv
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--radius FLOAT` | `83.2` | Fixed spatial radius (km) for all magnitudes |
+| `--window FLOAT` | `95.6` | Fixed temporal window (days) for all magnitudes |
+
+Both the aftershock CSV and mainshock CSV include the same attribution and summary columns described in the `decluster` section above.
+
+### Ocean/continent classification
+
+Classify events as `oceanic`, `continental`, or `transitional` based on distance to the nearest coastline vertex.
+
+#### Required data
+
+**Coastline vertex CSV** — Convert the Natural Earth `ne_10m_coastline` shapefile to a two-column `lon,lat` CSV and place it at `lib/ne_coastline_vertices.csv`. Using Python with the `shapefile` package (pyshp):
+
+```python
+import shapefile, csv
+sf = shapefile.Reader("ne_10m_coastline.shp")
+with open("lib/ne_coastline_vertices.csv", "w", newline="") as f:
+    w = csv.writer(f)
+    for shape in sf.shapes():
+        w.writerows(shape.points)
+```
+
+**PB2002 steps file** (optional, for `--method pb2002`) — Download `pb2002_steps.dat` from the [PB2002 publication page](http://peterbird.name/oldftp/PB2002/) and place it at `lib/pb2002_steps.dat`. Then generate the types lookup CSV:
+
+```bash
+uv run python -m nornir_urd parse-pb2002 \
+  --steps lib/pb2002_steps.dat \
+  --output lib/pb2002_types.csv
+```
+
+#### Running classification
+
+```bash
+uv run python -m nornir_urd ocean-class \
+  --input data/output/global_events.csv \
+  --output data/output/ocean_class.csv
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--method` | `ne` | Coastline source: `ne` (Natural Earth, recommended), `gshhg` (GSHHG vertex CSV), `pb2002` (PB2002 boundary proxy) |
+| `--coastline FILE` | `lib/ne_coastline_vertices.csv` | Vertex CSV path (used by `ne` and `gshhg` methods) |
+| `--pb2002-types FILE` | `lib/pb2002_types.csv` | PB2002 types CSV path (used by `pb2002` method) |
+| `--oceanic-km FLOAT` | `200` | Events farther than this from the coastline are `oceanic` |
+| `--coastal-km FLOAT` | `50` | Events within this distance are `continental`; between is `transitional` |
+
+Output columns: `usgs_id, ocean_class, dist_to_coast_km`
+
+### Focal mechanism join
+
+Join GCMT moment tensor solutions to ISC-GEM events by spatial-temporal proximity, classifying each matched event's focal mechanism type from its rake angle.
+
+#### Required data
+
+Download GCMT NDK files covering M ≥ 6.0, 1976–2021 from [globalcmt.org/CMTfiles.html](https://www.globalcmt.org/CMTfiles.html) and place all `.ndk` files in `lib/gcmt/`. The subcommand scans the directory for all `.ndk` files automatically. Pre-1976 ISC-GEM events (~15% of catalog) will have empty GCMT columns and `match_confidence=null`.
+
+#### Running the join
+
+```bash
+uv run python -m nornir_urd focal-join \
+  --input data/output/global_events.csv \
+  --output data/output/focal_mechanisms.csv
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--gcmt-dir DIR` | `lib/gcmt/` | Directory containing GCMT `.ndk` files |
+| `--time-tol FLOAT` | `60` | Time match tolerance (seconds) |
+| `--dist-km FLOAT` | `50` | Spatial match tolerance (km) |
+| `--mag-tol FLOAT` | `0.3` | Magnitude match tolerance (Mw units) |
+
+Output retains all input columns plus eight GCMT columns appended:
+
+| Column | Description |
+| --- | --- |
+| `gcmt_id` | GCMT event identifier (e.g. `M010176A`) |
+| `mechanism` | `thrust`, `normal`, `strike_slip`, or `oblique` |
+| `rake` | NP1 rake angle (degrees) |
+| `strike` | NP1 strike angle (degrees) |
+| `dip` | NP1 dip angle (degrees) |
+| `scalar_moment` | Scalar seismic moment M₀ (dyne-cm) |
+| `centroid_depth` | GCMT centroid depth (km) |
+| `match_confidence` | `proximity` (matched) or `null` (no match) |
+
+Mechanism classification uses rake angle: thrust ∈ [45°, 135°], normal ∈ [−135°, −45°], strike-slip covers the rest. Mw is computed from the GCMT scalar moment for magnitude matching.
+
+### Solar geometry
+
+Append three ephemeris-derived columns to a catalog using the DE421 ephemeris already present at `lib/de421.bsp`. No additional data is required.
+
+```bash
+uv run python -m nornir_urd solar-geometry \
+  --input data/output/global_events.csv \
+  --output data/output/solar_geometry.csv
+```
+
+| Option | Description |
+| --- | --- |
+| `--input FILE` | Input CSV; must have `usgs_id` and `event_at` |
+| `--output FILE` | Output CSV (all input columns retained; three new columns appended) |
+
+The three appended columns:
+
+| Column | Units | Range | Description |
+| --- | --- | --- | --- |
+| `solar_declination` | degrees | −23.5 to +23.5 | Sun's apparent declination at event time |
+| `declination_rate` | degrees/day | ~−0.40 to +0.40 | Rate of change of declination (central finite difference, ±0.5 day) |
+| `earth_sun_distance` | AU | ~0.983 to ~1.017 | Earth-Sun distance; minimum near January perihelion, maximum near July aphelion |
 
 ## Tests
 

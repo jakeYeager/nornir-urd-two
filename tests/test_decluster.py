@@ -3,8 +3,13 @@
 import pytest
 
 from nornir_urd.decluster import (
+    decluster_a1b_fixed,
+    decluster_a1b_with_parents,
     decluster_gardner_knopoff,
+    decluster_gardner_knopoff_table,
+    decluster_gardner_knopoff_with_parents,
     gk_window,
+    gk_window_table,
     haversine_km,
 )
 
@@ -333,3 +338,247 @@ class TestDecluster:
         assert main[0]["usgs_id"] == "mainshock"
         assert len(after) == 1
         assert after[0]["usgs_id"] == "aftershock"
+
+
+class TestGKWindowTable:
+    """gk_window_table() returns discrete values from the G-K (1974) paper table."""
+
+    def test_exact_threshold_values(self):
+        """Each magnitude at exactly a threshold boundary returns that row's values."""
+        expected = [
+            (7.0, 70.0, 985.0),
+            (6.5, 61.0, 960.0),
+            (6.0, 54.0, 915.0),
+            (5.5, 47.0, 790.0),
+            (5.0, 40.0, 510.0),
+            (4.5, 35.0, 290.0),
+            (4.0, 30.0, 155.0),
+            (3.5, 26.0,  83.0),
+            (3.0, 22.5,  42.0),
+            (2.5, 19.5,  22.0),
+        ]
+        for mag, exp_dist, exp_time in expected:
+            dist, time = gk_window_table(mag)
+            assert dist == exp_dist, f"M={mag}: expected dist {exp_dist}, got {dist}"
+            assert time == exp_time, f"M={mag}: expected time {exp_time}, got {time}"
+
+    def test_fractional_magnitude_uses_lower_row(self):
+        """M=6.3 is below the 6.5 threshold so uses the 6.0 row (54 km / 915 days)."""
+        dist, time = gk_window_table(6.3)
+        assert dist == 54.0
+        assert time == 915.0
+
+    def test_below_minimum_uses_floor_row(self):
+        """M=1.0 is below all table thresholds; the M=2.5 floor row is returned."""
+        dist, time = gk_window_table(1.0)
+        assert dist == 19.5
+        assert time == 22.0
+
+    def test_monotonically_increasing(self):
+        """Higher magnitudes produce larger or equal windows."""
+        mags = [2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0]
+        windows = [gk_window_table(m) for m in mags]
+        for i in range(len(windows) - 1):
+            assert windows[i][0] <= windows[i + 1][0]
+            assert windows[i][1] <= windows[i + 1][1]
+
+    def test_differs_from_formula_at_m6(self):
+        """Table and formula produce different temporal values at M=6.0."""
+        _dist_t, time_t = gk_window_table(6.0)
+        _dist_f, time_f = gk_window(6.0)
+        # Table: 915 days; formula: ~499 days — confirm they diverge significantly.
+        assert abs(time_t - time_f) > 100
+
+
+class TestDeclustersTableAndA1b:
+    """Smoke tests confirming decluster_gardner_knopoff_table and decluster_a1b_fixed
+    produce valid mainshock/aftershock splits."""
+
+    _MAINSHOCK = {
+        "usgs_id": "main",
+        "usgs_mag": 7.0,
+        "event_at": "2020-06-01T00:00:00Z",
+        "latitude": 35.0,
+        "longitude": 139.0,
+    }
+    _AFTERSHOCK = {
+        "usgs_id": "after",
+        "usgs_mag": 5.5,
+        "event_at": "2020-06-01T02:00:00Z",  # 2 h later, ~14 km away
+        "latitude": 35.1,
+        "longitude": 139.1,
+    }
+    _REMOTE = {
+        "usgs_id": "remote",
+        "usgs_mag": 6.0,
+        "event_at": "2020-06-01T01:00:00Z",
+        "latitude": -33.0,
+        "longitude": -70.0,  # Chile — thousands of km away
+    }
+
+    def test_table_empty(self):
+        assert decluster_gardner_knopoff_table([]) == ([], [])
+
+    def test_table_flags_close_aftershock(self):
+        main, after = decluster_gardner_knopoff_table([self._MAINSHOCK, self._AFTERSHOCK])
+        assert len(main) == 1 and main[0]["usgs_id"] == "main"
+        assert len(after) == 1 and after[0]["usgs_id"] == "after"
+
+    def test_table_does_not_flag_remote_event(self):
+        main, after = decluster_gardner_knopoff_table([self._MAINSHOCK, self._REMOTE])
+        assert len(main) == 2
+        assert len(after) == 0
+
+    def test_a1b_empty(self):
+        assert decluster_a1b_fixed([]) == ([], [])
+
+    def test_a1b_flags_event_within_fixed_window(self):
+        """Event within 83.2 km and 95.6 days of a larger event is flagged."""
+        main, after = decluster_a1b_fixed([self._MAINSHOCK, self._AFTERSHOCK])
+        assert len(main) == 1 and main[0]["usgs_id"] == "main"
+        assert len(after) == 1 and after[0]["usgs_id"] == "after"
+
+    def test_a1b_does_not_flag_remote_event(self):
+        main, after = decluster_a1b_fixed([self._MAINSHOCK, self._REMOTE])
+        assert len(main) == 2
+        assert len(after) == 0
+
+    def test_a1b_custom_tight_window_misses_event(self):
+        """With a 1 km radius, a ~14 km-distant event is not flagged."""
+        main, after = decluster_a1b_fixed(
+            [self._MAINSHOCK, self._AFTERSHOCK], radius_km=1.0, window_days=365.0
+        )
+        assert len(main) == 2
+        assert len(after) == 0
+
+    def test_a1b_preserves_extra_keys(self):
+        event = dict(self._MAINSHOCK, depth=10.0, extra="hello")
+        main, _ = decluster_a1b_fixed([event])
+        assert main[0]["depth"] == 10.0
+        assert main[0]["extra"] == "hello"
+
+
+class TestDeclustersWithParents:
+    """Tests for decluster_gardner_knopoff_with_parents and decluster_a1b_with_parents."""
+
+    _MAINSHOCK = {
+        "usgs_id": "main",
+        "usgs_mag": 7.0,
+        "event_at": "2020-06-01T00:00:00Z",
+        "latitude": 35.0,
+        "longitude": 139.0,
+    }
+    _AFTERSHOCK = {
+        "usgs_id": "after",
+        "usgs_mag": 5.5,
+        "event_at": "2020-06-01T02:00:00Z",  # 7200 s later, ~14 km away
+        "latitude": 35.1,
+        "longitude": 139.1,
+    }
+    _FORESHOCK = {
+        "usgs_id": "fore",
+        "usgs_mag": 5.0,
+        "event_at": "2020-05-31T22:00:00Z",  # 7200 s before mainshock
+        "latitude": 35.05,
+        "longitude": 139.05,
+    }
+
+    # --- empty catalog ---
+
+    def test_gk_empty(self):
+        assert decluster_gardner_knopoff_with_parents([]) == ([], [])
+
+    def test_a1b_empty(self):
+        assert decluster_a1b_with_parents([]) == ([], [])
+
+    # --- attribution keys present on aftershock dicts ---
+
+    def test_gk_aftershock_has_attribution_keys(self):
+        main, after = decluster_gardner_knopoff_with_parents(
+            [self._MAINSHOCK, self._AFTERSHOCK]
+        )
+        assert len(main) == 1
+        assert len(after) == 1
+        for key in ("parent_id", "parent_magnitude", "delta_t_sec", "delta_dist_km"):
+            assert key in after[0], f"missing key: {key}"
+
+    def test_a1b_aftershock_has_attribution_keys(self):
+        main, after = decluster_a1b_with_parents(
+            [self._MAINSHOCK, self._AFTERSHOCK]
+        )
+        assert len(after) == 1
+        for key in ("parent_id", "parent_magnitude", "delta_t_sec", "delta_dist_km"):
+            assert key in after[0], f"missing key: {key}"
+
+    # --- parent_id and parent_magnitude values ---
+
+    def test_gk_parent_id_and_magnitude(self):
+        _, after = decluster_gardner_knopoff_with_parents(
+            [self._MAINSHOCK, self._AFTERSHOCK]
+        )
+        assert after[0]["parent_id"] == "main"
+        assert after[0]["parent_magnitude"] == 7.0
+
+    # --- delta_t_sec sign for aftershock vs foreshock ---
+
+    def test_gk_aftershock_positive_delta_t(self):
+        """True aftershock (after mainshock) has positive delta_t_sec."""
+        _, after = decluster_gardner_knopoff_with_parents(
+            [self._MAINSHOCK, self._AFTERSHOCK]
+        )
+        assert after[0]["delta_t_sec"] > 0
+
+    def test_gk_foreshock_negative_delta_t(self):
+        """Foreshock (before mainshock) has negative delta_t_sec."""
+        _, after = decluster_gardner_knopoff_with_parents(
+            [self._FORESHOCK, self._MAINSHOCK]
+        )
+        assert len(after) == 1
+        assert after[0]["usgs_id"] == "fore"
+        assert after[0]["delta_t_sec"] < 0
+
+    def test_gk_delta_t_magnitude(self):
+        """delta_t_sec is ±7200 seconds for events exactly 2 hours apart."""
+        _, after = decluster_gardner_knopoff_with_parents(
+            [self._MAINSHOCK, self._AFTERSHOCK]
+        )
+        assert abs(after[0]["delta_t_sec"] - 7200.0) < 1.0
+
+    # --- delta_dist_km accuracy ---
+
+    def test_gk_delta_dist_matches_haversine(self):
+        _, after = decluster_gardner_knopoff_with_parents(
+            [self._MAINSHOCK, self._AFTERSHOCK]
+        )
+        expected = haversine_km(35.0, 139.0, 35.1, 139.1)
+        assert abs(after[0]["delta_dist_km"] - expected) < 0.01
+
+    # --- mainshocks carry no extra attribution keys ---
+
+    def test_gk_mainshock_has_no_extra_keys(self):
+        main, _ = decluster_gardner_knopoff_with_parents(
+            [self._MAINSHOCK, self._AFTERSHOCK]
+        )
+        for key in ("parent_id", "parent_magnitude", "delta_t_sec", "delta_dist_km"):
+            assert key not in main[0], f"unexpected key on mainshock: {key}"
+
+    # --- isolated event is a mainshock with no attribution ---
+
+    def test_gk_single_event_is_mainshock(self):
+        main, after = decluster_gardner_knopoff_with_parents([self._MAINSHOCK])
+        assert len(main) == 1
+        assert len(after) == 0
+
+    # --- a1b fixed-window variant ---
+
+    def test_a1b_parent_id_correct(self):
+        _, after = decluster_a1b_with_parents([self._MAINSHOCK, self._AFTERSHOCK])
+        assert after[0]["parent_id"] == "main"
+
+    def test_a1b_tight_window_produces_no_aftershocks(self):
+        """With a 1 km radius no dependent events are found."""
+        main, after = decluster_a1b_with_parents(
+            [self._MAINSHOCK, self._AFTERSHOCK], radius_km=1.0, window_days=365.0
+        )
+        assert len(main) == 2
+        assert len(after) == 0
