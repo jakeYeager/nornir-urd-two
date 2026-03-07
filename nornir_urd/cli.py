@@ -478,12 +478,18 @@ def _run_decluster_table(args: argparse.Namespace) -> None:
 
 def _run_decluster_reasenberg(args: argparse.Namespace) -> None:
     fieldnames, events = _load_decluster_csv(args.input)
+    p = args.p_value
+    if not (0.0 < p < 1.0):
+        raise SystemExit(
+            f"--p-value must be in (0, 1), got {p}. "
+            "Did you mean to pass a fraction (e.g. 0.90 instead of 90)?"
+        )
     mainshocks, aftershocks = decluster_reasenberg(
         events,
         rfact=args.rfact,
         tau_min=args.tau_min,
         tau_max=args.tau_max,
-        p=args.p_value,
+        p=p,
         xmeff=args.xmeff,
     )
     _write_decluster_outputs(args, fieldnames, mainshocks, aftershocks)
